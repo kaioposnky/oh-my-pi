@@ -23,7 +23,9 @@ import {
 	withTimeoutSignal,
 } from "../utils/fetch-timeout";
 
-const REPO = "can1357/oh-my-pi";
+// Fork redirect: updates resolve against the kaioposnky/oh-my-pi fork so users
+// of the fixed build never pull (or are nagged toward) upstream builds.
+const REPO = "kaioposnky/oh-my-pi";
 const PACKAGE = "@oh-my-pi/pi-coding-agent";
 const HOMEBREW_FORMULA = "can1357/tap/omp";
 const MISE_TOOL = "github:can1357/oh-my-pi";
@@ -756,22 +758,25 @@ async function resolveUpdateTarget(options: { allowPackageManagers: boolean }): 
 	throw new Error(`Could not resolve ${APP_NAME} binary path in PATH`);
 }
 
-/** Bound on `omp.rename` hops so a broken pointer chain cannot loop forever. */
-const MAX_RENAME_HOPS = 3;
-
-async function fetchLatestManifest(
-	pkg: string,
-	timeoutMs: number,
-	channel: UpdateChannel,
-): Promise<{ version: string; manifest: Record<string, unknown> }> {
+/**
+ * Get the latest release info from the fork's GitHub releases.
+ *
+ * The fork ships binaries only (it does not publish to npm), so every release
+ * resolves to the binary distribution channel: the updater downloads the
+ * platform binary from `${REPO}` releases and verifies it against GitHub's
+ * per-asset SHA-256 digest before replacing the installed binary.
+ */
+export async function getLatestRelease(options: { timeoutMs?: number } = {}): Promise<ReleaseInfo> {
+	const timeoutMs = options.timeoutMs ?? RELEASE_METADATA_TIMEOUT_MS;
 	let response: Response;
 	try {
-		response = await fetch(`${NPM_REGISTRY}${pkg}/${channel === "canary" ? "canary" : "latest"}`, {
+		response = await fetch(`${GITHUB_API}/repos/${REPO}/releases/latest`, {
+			headers: { Accept: "application/vnd.github+json" },
 			signal: withTimeoutSignal(timeoutMs),
 		});
 	} catch (err) {
 		if (isTimeoutError(err)) {
-			throw new Error(`Timed out fetching release info for ${pkg} after ${Math.round(timeoutMs / 1000)}s`, {
+			throw new Error(`Timed out fetching release info for ${REPO} after ${Math.round(timeoutMs / 1000)}s`, {
 				cause: err,
 			});
 		}
@@ -779,48 +784,19 @@ async function fetchLatestManifest(
 		throw err;
 	}
 	if (!response.ok) {
-		if (response.status === 404 && channel === "canary") {
-			throw new Error(`No canary release has been published for ${pkg} yet. Try \`${APP_NAME} update --stable\`.`);
-		}
-		throw new Error(`Failed to fetch release info for ${pkg}: ${response.statusText}`);
+		throw new Error(`Failed to fetch release info for ${REPO}: ${response.statusText}`);
 	}
 
 	const data: unknown = await response.json();
-	if (!isRecord(data) || typeof data.version !== "string") {
-		throw new Error(`Malformed npm registry response for ${pkg}: missing version`);
+	if (!isRecord(data) || typeof data.tag_name !== "string") {
+		throw new Error(`Malformed GitHub release response for ${REPO}: missing tag_name`);
 	}
-	return { version: data.version, manifest: data };
-}
-
-/**
- * Get the latest release info from the npm registry, following `omp.rename`
- * pointers ({@link resolveReleaseRename}) when the package has moved to a new
- * npm name. Version, dist, and install names all come from the final manifest
- * in the chain. Uses npm instead of GitHub API to avoid unauthenticated rate
- * limiting.
- */
-export async function getLatestRelease(
-	options: { timeoutMs?: number; channel?: UpdateChannel } = {},
-): Promise<ReleaseInfo> {
-	const timeoutMs = options.timeoutMs ?? RELEASE_METADATA_TIMEOUT_MS;
-	const channel = options.channel ?? "stable";
-	const packages: ReleasePackages = { ...CURRENT_PACKAGES };
-	const visited = new Set([packages.pkg]);
-	let latest = await fetchLatestManifest(packages.pkg, timeoutMs, channel);
-	for (let hop = 0; hop < MAX_RENAME_HOPS; hop++) {
-		const rename = resolveReleaseRename(latest.manifest);
-		if (!rename || visited.has(rename.pkg)) break;
-		visited.add(rename.pkg);
-		packages.pkg = rename.pkg;
-		if (rename.natives) packages.natives = rename.natives;
-		latest = await fetchLatestManifest(packages.pkg, timeoutMs, channel);
-	}
-
+	const version = data.tag_name.replace(/^v/, "");
 	return {
-		tag: `v${latest.version}`,
-		version: latest.version,
-		dist: resolveReleaseDist(latest.manifest),
-		packages,
+		tag: `v${version}`,
+		version,
+		dist: "binary",
+		packages: { ...CURRENT_PACKAGES },
 	};
 }
 
