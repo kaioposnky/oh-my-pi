@@ -106,9 +106,10 @@ jobs:
           set -euo pipefail
           mkdir -p release-assets
           for target in darwin-arm64 darwin-x64 linux-arm64 linux-x64 win32-x64; do
-            src="omp-$target"
             case "$target" in
-              win32-x64) src="omp-win32-x64.exe" ;;
+              # Build output is omp-<id>; the windows artifact ships as omp-windows-x64.exe.
+              win32-x64) src="omp-windows-x64.exe" ;;
+              *) src="omp-$target" ;;
             esac
             test -f "packages/coding-agent/binaries/$src" || { echo "::error::Missing binary $src"; exit 1; }
             cp "packages/coding-agent/binaries/$src" "release-assets/$src"
