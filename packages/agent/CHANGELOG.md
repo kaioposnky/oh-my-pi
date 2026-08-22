@@ -2,6 +2,10 @@
 
 ## [Unreleased]
 
+### Fixed
+
+- Tool calls whose name was truncated by the provider (final character dropped, e.g. `echo` → `ech`) now execute against the intended advertised tool instead of failing with "not found"; history carries the canonical name.
+
 ## [17.4.1] - 2026-08-21
 
 ### Fixed
