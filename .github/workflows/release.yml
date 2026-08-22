@@ -93,9 +93,15 @@ jobs:
         if: steps.gate.outputs.skip == 'false'
         run: |
           set -euo pipefail
+          # Pin to the exact @oh-my-pi/pi-natives version this tree expects:
+          # the compiled loader rejects any addon whose baked-in
+          # __piNativesV<version> sentinel differs from its own package
+          # version, and npm's unpinned "latest" can be a different release.
+          natives_version="$(jq -r .version packages/natives/package.json)"
+          echo "Fetching pi-natives leaf packages at ${natives_version}"
           mkdir -p packages/natives/native
           for tag in linux-x64 linux-arm64 darwin-arm64 darwin-x64 win32-x64; do
-            tarball="$(npm view "@oh-my-pi/pi-natives-$tag" dist.tarball)"
+            tarball="$(npm view "@oh-my-pi/pi-natives-$tag@${natives_version}" dist.tarball)"
             dir="$RUNNER_TEMP/natives-$tag"
             rm -rf "$dir" && mkdir -p "$dir"
             echo "Fetching $tarball"
