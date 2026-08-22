@@ -136,7 +136,7 @@ EOT
 pct() {
   local fmt="$1"
   shift
-  printf "$fmt\n" "$@"
+  printf -- "$fmt\n" "$@"
 }
 
 die() { echo "!! $*" >&2; exit 1; }
