@@ -1,0 +1,138 @@
+name: Release
+
+on:
+  workflow_run:
+    workflows: ["Sync with upstream"]
+    types: [completed]
+  schedule:
+    # Fallback shortly after the daily sync window.
+    - cron: "3 7 * * *"
+  workflow_dispatch:
+    inputs:
+      force:
+        description: "Rebuild and re-upload even if the release already matches this commit"
+        type: boolean
+        default: false
+
+permissions:
+  contents: write
+
+concurrency:
+  group: release
+  cancel-in-progress: false
+
+jobs:
+  release:
+    if: >-
+      ${{ github.event_name != 'workflow_run' ||
+          github.event.workflow_run.conclusion == 'success' }}
+    runs-on: ubuntu-latest
+    env:
+      GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      UPSTREAM_REPO: can1357/oh-my-pi
+      FORK_BRANCH: truncated-tool-names
+      FORK_REPO: kaioposnky/oh-my-pi
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: truncated-tool-names
+          fetch-depth: 0
+
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version-file: .bun-version
+
+      - name: Install dependencies
+        run: bun install
+
+      - name: Resolve upstream latest version
+        id: ver
+        run: |
+          tag="$(gh api "repos/$UPSTREAM_REPO/releases/latest" --jq .tag_name)"
+          if [ -z "$tag" ]; then echo "::error::Upstream has no releases"; exit 1; fi
+          echo "version=${tag#v}" >> "$GITHUB_OUTPUT"
+          echo "tag=$tag" >> "$GITHUB_OUTPUT"
+
+      - name: Skip if release already built from this commit
+        id: gate
+        run: |
+          sha="$(git rev-parse HEAD)"
+          echo "sha=$sha" >> "$GITHUB_OUTPUT"
+          if [ "${{ inputs.force }}" != "true" ] \
+            && gh release view "$VER_TAG" --repo "$FORK_REPO" --json body --jq .body 2>/dev/null \
+               | grep -q "fork-build-sha:$sha"; then
+            echo "Release $VER_TAG already built from $sha — skipping."
+            echo "skip=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "skip=false" >> "$GITHUB_OUTPUT"
+          fi
+        env:
+          VER_TAG: ${{ steps.ver.outputs.tag }}
+
+      - name: Stamp fork build version
+        if: steps.gate.outputs.skip == 'false'
+        run: |
+          set -euo pipefail
+          version="${{ steps.ver.outputs.version }}"
+          for pkg in packages/utils/package.json packages/coding-agent/package.json; do
+            tmp="$(mktemp)"
+            jq --arg v "$version" '.version = $v' "$pkg" > "$tmp"
+            mv "$tmp" "$pkg"
+          done
+
+      - name: Fetch prebuilt native addons
+        if: steps.gate.outputs.skip == 'false'
+        run: |
+          set -euo pipefail
+          mkdir -p packages/natives/native
+          for tag in linux-x64 linux-arm64 darwin-arm64 darwin-x64 win32-x64; do
+            tarball="$(npm view "@oh-my-pi/pi-natives-$tag" dist.tarball)"
+            dir="$RUNNER_TEMP/natives-$tag"
+            rm -rf "$dir" && mkdir -p "$dir"
+            echo "Fetching $tarball"
+            curl -fsSL --retry 3 "$tarball" | tar -xz -C "$dir"
+            cp "$dir/package/"*.node packages/natives/native/
+          done
+          ls packages/natives/native/
+
+      - name: Build all targets
+        if: steps.gate.outputs.skip == 'false'
+        run: |
+          bun run ci:release:build-binaries --targets=darwin-arm64,darwin-x64,linux-arm64,linux-x64,win32-x64
+
+      - name: Collect release assets
+        if: steps.gate.outputs.skip == 'false'
+        run: |
+          set -euo pipefail
+          mkdir -p release-assets
+          for target in darwin-arm64 darwin-x64 linux-arm64 linux-x64 win32-x64; do
+            src="omp-$target"
+            case "$target" in
+              win32-x64) src="omp-win32-x64.exe" ;;
+            esac
+            test -f "packages/coding-agent/binaries/$src" || { echo "::error::Missing binary $src"; exit 1; }
+            cp "packages/coding-agent/binaries/$src" "release-assets/$src"
+          done
+          bun scripts/ci-release-checksums.ts release-assets/SHA256SUMS.txt release-assets/omp-*
+          ls -la release-assets/
+
+      - name: Create or update release
+        if: steps.gate.outputs.skip == 'false'
+        run: |
+          set -euo pipefail
+          sha="$(git rev-parse HEAD)"
+          notes="Fork build of upstream v$VERSION with the provider tool-name truncation fix.
+
+          Assets are verified with SHA256SUMS.txt (\`sha256sum -c SHA256SUMS.txt\`); the updater also validates each binary against GitHub's per-asset digest.
+
+          <!-- fork-build-sha:$sha -->"
+          if gh release view "$TAG" --repo "$FORK_REPO" > /dev/null 2>&1; then
+            gh release edit "$TAG" --repo "$FORK_REPO" --notes "$notes" --latest
+          else
+            gh release create "$TAG" --repo "$FORK_REPO" \
+              --target "$FORK_BRANCH" --title "omp v$VERSION (fork)" --notes "$notes" --latest
+          fi
+          gh release upload "$TAG" release-assets/* --clobber --repo "$FORK_REPO"
+        env:
+          TAG: ${{ steps.ver.outputs.tag }}
+          VERSION: ${{ steps.ver.outputs.version }}
