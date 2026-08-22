@@ -32,6 +32,16 @@ The most capable agent surface that ships. Continuously tuned by real-world use 
 > while we evaluate how open contributions go. Depending on the results, the
 > vouch system may return.
 
+> [!IMPORTANT]
+> **This is a fork** — [kaioposnky/oh-my-pi](https://github.com/kaioposnky/oh-my-pi), tracking upstream [can1357/oh-my-pi](https://github.com/can1357/oh-my-pi) with one fix on top ([`fix(agent): recover provider-truncated tool-call names`](https://github.com/kaioposnky/oh-my-pi/commit/d549df5f1807bf3eddc8eecd87d4f828ed4ebfeb)).
+>
+> Some providers (notably **Verboo** models) drop the last character of tool-call names (`read` → `rea`), which breaks every harness that consumes them. Upstream fixed it only in their own CLI, so this fork ports the recovery into oh-my-pi: truncated calls are resolved against the advertised tool set in the agent loop and in `validateToolCall`, and history is rewritten to the canonical name — instead of failing with "not found".
+>
+> **Este é um fork** que acompanha o upstream com uma correção adicional: provedores que derrubam o último caractere do nome da ferramenta (ex.: modelos Verboo) faziam toda chamada falhar com "not found". Aqui o nome truncado é recuperado e a ferramenta correta executa.
+>
+> - **Updates**: a daily workflow rebases this branch onto upstream and ships verified fork releases (SHA256SUMS.txt); the built-in updater reads **this fork's releases**, never upstream. / Um workflow diário sincroniza com o upstream e publica releases verificadas; o atualizador interno aponta para este fork.
+> - **Install / Instalação**: `curl -fsSL https://raw.githubusercontent.com/kaioposnky/oh-my-pi/truncated-tool-names/install.sh | bash` (bilingual EN/PT-BR installer; Windows: `install.ps1`)
+
 ## Install
 
 **macOS · Linux**
