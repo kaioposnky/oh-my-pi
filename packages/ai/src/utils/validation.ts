@@ -1890,14 +1890,37 @@ function healInbandArgSpill(value: unknown): { value: unknown; changed: boolean 
 const MAX_COERCION_PASSES = 5;
 
 /**
+ * Resolves a canonical tool name from an exact match or an unambiguous
+ * provider-truncated prefix. Some providers drop the final character of
+ * streamed tool names (e.g. advertised `read` arrives as `rea`); recover the
+ * intended tool when exactly one candidate completes the truncated name,
+ * preferring a unique one-character completion over a longer unique prefix.
+ */
+export function resolveToolNameByUniquePrefix(toolNames: readonly string[], name: string): string | undefined {
+	const uniqueToolNames = [...new Set(toolNames)];
+	if (uniqueToolNames.includes(name)) return name;
+	if (name.length < 3) return undefined;
+	const prefixMatches = uniqueToolNames.filter(toolName => toolName.startsWith(name));
+	const oneCharacterCompletions = prefixMatches.filter(toolName => toolName.length === name.length + 1);
+	if (oneCharacterCompletions.length === 1) return oneCharacterCompletions[0];
+	return prefixMatches.length === 1 ? prefixMatches[0] : undefined;
+}
+
+/**
  * Finds a tool by name and validates the tool call arguments against its schema.
+ * Falls back to provider-truncation recovery via `resolveToolNameByUniquePrefix`
+ * when the exact name matches no advertised tool.
  * @param tools Array of tool definitions
  * @param toolCall The tool call from the LLM
  * @returns The validated arguments
  * @throws Error if tool is not found or validation fails
  */
 export function validateToolCall(tools: Tool[], toolCall: ToolCall): ToolCall["arguments"] {
-	const tool = tools.find(t => t.name === toolCall.name);
+	const resolvedName = resolveToolNameByUniquePrefix(
+		tools.map(t => t.name),
+		toolCall.name,
+	);
+	const tool = tools.find(t => t.name === (resolvedName ?? toolCall.name));
 	if (!tool) {
 		throw new AIError.ToolNotFoundError(toolCall.name);
 	}
