@@ -1,0 +1,52 @@
+name: Sync with upstream
+
+on:
+  schedule:
+    # Daily at 05:37 UTC.
+    - cron: "37 5 * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: sync-upstream
+  cancel-in-progress: false
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: truncated-tool-names
+          fetch-depth: 0
+
+      - name: Configure git author
+        run: |
+          git config user.name "kaioposnky-fork-sync"
+          git config user.email "kaioposnky-fork-sync@users.noreply.github.com"
+
+      - name: Fetch upstream
+        run: |
+          git remote add upstream https://github.com/can1357/oh-my-pi.git
+          git fetch upstream main
+
+      - name: Rebase onto upstream/main
+        run: |
+          before="$(git rev-parse HEAD)"
+          echo "BEFORE_SHA=$before" >> "$GITHUB_ENV"
+          if ! git rebase upstream/main; then
+            git rebase --abort
+            echo "::error::Rebase onto upstream/main produced conflicts — resolve manually on 'truncated-tool-names', then re-run this workflow."
+            exit 1
+          fi
+
+      - name: Push
+        run: |
+          after="$(git rev-parse HEAD)"
+          if [ "$after" = "$BEFORE_SHA" ]; then
+            echo "Already up to date with upstream/main."
+            exit 0
+          fi
+          git push --force-with-lease="refs/heads/truncated-tool-names:$BEFORE_SHA" origin truncated-tool-names
