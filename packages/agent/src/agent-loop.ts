@@ -13,6 +13,7 @@ import {
 	isApiKeyResolver,
 	type Model,
 	resolveApiKeyOnce,
+	resolveToolNameByUniquePrefix,
 	seedApiKeyResolver,
 	streamSimple,
 	stripSchemaDescriptions,
@@ -2824,7 +2825,8 @@ function resolveToolForCall(
 		// (e.g. xd:// device mounts) called by their top-level name. It receives
 		// the snapshot searched above, never the agent's live tools, so a
 		// mid-stream roster change cannot widen what this request can reach.
-		resolveFallbackTool?.(toolCall.name, tools ?? [])
+		resolveFallbackTool?.(toolCall.name, tools ?? []) ??
+		resolveTruncatedToolCall(tools, toolCall)
 	);
 }
 
@@ -2994,6 +2996,25 @@ function ensureUniqueToolCallIds(message: ToolCallIdsRepairedCarrier, dispatched
 		dispatchedIds.add(candidate);
 	}
 	message[kToolCallIdsRepaired] = true;
+}
+
+/**
+ * Some providers drop the final character of streamed tool names (e.g.
+ * advertised `read` arrives as `rea`). Recover when exactly one advertised
+ * tool completes the truncated prefix, and rewrite the call so history,
+ * persistence, and provider replay all carry the canonical name.
+ */
+function resolveTruncatedToolCall(
+	tools: AgentTool<any>[] | undefined,
+	toolCall: AgentToolCall,
+): AgentTool<any> | undefined {
+	const resolvedName = resolveToolNameByUniquePrefix(
+		(tools ?? []).map(t => t.name),
+		toolCall.name,
+	);
+	if (!resolvedName) return undefined;
+	toolCall.name = resolvedName;
+	return tools?.find(t => t.name === resolvedName);
 }
 
 /**
