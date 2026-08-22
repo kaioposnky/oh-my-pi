@@ -12,6 +12,7 @@ import {
 	isApiKeyResolver,
 	type Model,
 	resolveApiKeyOnce,
+	resolveToolNameByUniquePrefix,
 	seedApiKeyResolver,
 	streamSimple,
 	stripSchemaDescriptions,
@@ -2203,8 +2204,28 @@ function resolveToolForCall(
 		tools?.find(t => t.customWireName !== undefined && t.customWireName === toolCall.name) ??
 		// Not in the advertised set: let the host route side-transport tools
 		// (e.g. xd:// device mounts) called by their top-level name.
-		resolveFallbackTool?.(toolCall.name)
+		resolveFallbackTool?.(toolCall.name) ??
+		resolveTruncatedToolCall(tools, toolCall)
 	);
+}
+
+/**
+ * Some providers drop the final character of streamed tool names (e.g.
+ * advertised `read` arrives as `rea`). Recover when exactly one advertised
+ * tool completes the truncated prefix, and rewrite the call so history,
+ * persistence, and provider replay all carry the canonical name.
+ */
+function resolveTruncatedToolCall(
+	tools: AgentTool<any>[] | undefined,
+	toolCall: AgentToolCall,
+): AgentTool<any> | undefined {
+	const resolvedName = resolveToolNameByUniquePrefix(
+		(tools ?? []).map(t => t.name),
+		toolCall.name,
+	);
+	if (!resolvedName) return undefined;
+	toolCall.name = resolvedName;
+	return tools?.find(t => t.name === resolvedName);
 }
 
 /**
