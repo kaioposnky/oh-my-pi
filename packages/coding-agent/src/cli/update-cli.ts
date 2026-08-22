@@ -21,17 +21,13 @@ import {
 	unsupportedProxyMessage,
 	withTimeoutSignal,
 } from "../utils/fetch-timeout";
-import {
-	DEFAULT_NPM_REGISTRY,
-	loadNpmRegistryResolver,
-	type NpmRegistry,
-	type NpmRegistryResolver,
-	npmRegistryPackageUrl,
-} from "./npm-registry";
+import { DEFAULT_NPM_REGISTRY } from "./npm-registry";
 
 import { cfgUpdateChannel } from "../modes/settings";
 
-const REPO = "can1357/oh-my-pi";
+// Fork redirect: updates resolve against the kaioposnky/oh-my-pi fork so users
+// of the fixed build never pull (or are nagged toward) upstream builds.
+const REPO = "kaioposnky/oh-my-pi";
 const PACKAGE = "@oh-my-pi/pi-coding-agent";
 const HOMEBREW_FORMULA = "can1357/tap/omp";
 const MISE_TOOL = "github:can1357/oh-my-pi";
@@ -883,131 +879,53 @@ async function resolveUpdateTarget(options: { allowPackageManagers: boolean }): 
 	throw new Error(`Could not resolve ${APP_NAME} binary path in PATH`);
 }
 
-/** Bound on `omp.rename` hops so a broken pointer chain cannot loop forever. */
-const MAX_RENAME_HOPS = 3;
-
-async function fetchLatestManifest(
-	pkg: string,
-	registry: NpmRegistry,
-	timeoutMs: number,
-	channel: UpdateChannel,
-): Promise<{ version: string; manifest: Record<string, unknown> }> {
-	const tag = channel === "canary" ? "canary" : "latest";
-	const headers: Record<string, string> = { accept: "application/json" };
-	if (registry.authorization) headers.authorization = registry.authorization;
-	const origin = registry.url === DEFAULT_NPM_REGISTRY ? "" : ` from ${registry.url} (${registry.source})`;
-	const get = async (url: string): Promise<Response> => {
-		try {
-			return await fetch(url, { headers, signal: withTimeoutSignal(timeoutMs) });
-		} catch (err) {
-			if (isTimeoutError(err)) {
-				throw new Error(
-					`Timed out fetching release info for ${pkg}${origin} after ${Math.round(timeoutMs / 1000)}s`,
-					{ cause: err },
-				);
-			}
-			if (isUnsupportedProxyError(err)) throw new Error(unsupportedProxyMessage(), { cause: err });
-			throw err;
-		}
-	};
-	const noCanary = () =>
-		new Error(`No canary release has been published for ${pkg} yet. Try \`${APP_NAME} update --stable\`.`);
-
-	const fromPackument = (packument: unknown): Record<string, unknown> => {
-		const distTags = isRecord(packument) ? packument["dist-tags"] : undefined;
-		const version = isRecord(distTags) ? distTags[tag] : undefined;
-		if (typeof version !== "string") {
-			if (channel === "canary") throw noCanary();
-			throw new Error(`Malformed npm registry response for ${pkg}${origin}: missing dist-tags.${tag}`);
-		}
-		const versions = isRecord(packument) ? packument.versions : undefined;
-		const manifest = isRecord(versions) ? versions[version] : undefined;
-		if (!isRecord(manifest)) {
-			throw new Error(`Malformed npm registry response for ${pkg}${origin}: missing versions.${version}`);
-		}
-		return manifest;
-	};
-	const isPackument = (body: unknown): boolean => isRecord(body) && isRecord(body["dist-tags"]);
-
-	let response = await get(npmRegistryPackageUrl(registry, pkg, tag));
-	let data: unknown;
-	let useFullPackument = false;
-	if (response.ok) {
-		try {
-			data = await response.json();
-		} catch (err) {
-			// Only a malformed body falls back; body-read timeouts and resets must surface.
-			if (!origin || !(err instanceof SyntaxError)) throw err;
-			useFullPackument = true;
-		}
-		if (isPackument(data)) {
-			// Some registries (e.g. Sonatype Nexus) answer the dist-tag shortcut
-			// with the full packument instead of the tagged version manifest.
-			data = fromPackument(data);
-		} else if (origin && !(isRecord(data) && typeof data.version === "string")) {
-			useFullPackument = true;
-		}
-	} else if (origin && [400, 404, 405].includes(response.status)) {
-		useFullPackument = true;
-	}
-	if (useFullPackument) {
-		// Not every registry implementation serves npmjs's `/<pkg>/<dist-tag>`
-		// shortcut; the full packument is the one endpoint all of them share.
-		response = await get(npmRegistryPackageUrl(registry, pkg));
-		data = response.ok ? fromPackument(await response.json()) : undefined;
-	}
-	if (!response.ok) {
-		if (response.status === 404 && channel === "canary") throw noCanary();
-		const authHint =
-			response.status === 401 || response.status === 403 ? "; check the registry credentials in your .npmrc" : "";
-		throw new Error(
-			`Failed to fetch release info for ${pkg}${origin}: ${response.status} ${response.statusText}${authHint}`,
-		);
-	}
-
-	if (!isRecord(data) || typeof data.version !== "string") {
-		throw new Error(`Malformed npm registry response for ${pkg}${origin}: missing version`);
-	}
-	return { version: data.version, manifest: data };
-}
 
 /**
- * Get the latest release info from the npm registry, following `omp.rename`
- * pointers ({@link resolveReleaseRename}) when the package has moved to a new
- * npm name. Version, dist, and install names all come from the final manifest
- * in the chain. Uses npm instead of GitHub API to avoid unauthenticated rate
- * limiting.
+ * Get the latest release info from the fork's GitHub releases.
  *
- * The registry comes from the user's npm/bun configuration
- * ({@link loadNpmRegistryResolver}), so a configured feed is honored for every
- * install method, including standalone binaries.
+ * The fork ships binaries only (it does not publish to npm), so every release
+ * resolves to the binary distribution channel: the updater downloads the
+ * platform binary from `${REPO}` releases and verifies it against GitHub's
+ * per-asset SHA-256 digest before replacing the installed binary.
  */
 export async function getLatestRelease(
-	options: { timeoutMs?: number; channel?: UpdateChannel; registries?: NpmRegistryResolver } = {},
+	options: { timeoutMs?: number; channel?: UpdateChannel } = {},
 ): Promise<ReleaseInfo> {
+	if (options.channel === "canary") {
+		throw new Error(
+			`The ${REPO} binary release channel does not publish canary builds. Use \`${APP_NAME} update --stable\`.`,
+		);
+	}
 	const timeoutMs = options.timeoutMs ?? RELEASE_METADATA_TIMEOUT_MS;
-	const channel = options.channel ?? "stable";
-	const registries = options.registries ?? (await loadNpmRegistryResolver());
-	const packages: ReleasePackages = { ...CURRENT_PACKAGES };
-	const visited = new Set([packages.pkg]);
-	let registry = registries(packages.pkg);
-	let latest = await fetchLatestManifest(packages.pkg, registry, timeoutMs, channel);
-	for (let hop = 0; hop < MAX_RENAME_HOPS; hop++) {
-		const rename = resolveReleaseRename(latest.manifest);
-		if (!rename || visited.has(rename.pkg)) break;
-		visited.add(rename.pkg);
-		packages.pkg = rename.pkg;
-		if (rename.natives) packages.natives = rename.natives;
-		registry = registries(packages.pkg);
-		latest = await fetchLatestManifest(packages.pkg, registry, timeoutMs, channel);
+	let response: Response;
+	try {
+		response = await fetch(`${GITHUB_API}/repos/${REPO}/releases/latest`, {
+			headers: { Accept: "application/vnd.github+json" },
+			signal: withTimeoutSignal(timeoutMs),
+		});
+	} catch (err) {
+		if (isTimeoutError(err)) {
+			throw new Error(`Timed out fetching release info for ${REPO} after ${Math.round(timeoutMs / 1000)}s`, {
+				cause: err,
+			});
+		}
+		if (isUnsupportedProxyError(err)) throw new Error(unsupportedProxyMessage(), { cause: err });
+		throw err;
+	}
+	if (!response.ok) {
+		throw new Error(`Failed to fetch release info for ${REPO}: ${response.statusText}`);
 	}
 
+	const data: unknown = await response.json();
+	if (!isRecord(data) || typeof data.tag_name !== "string") {
+		throw new Error(`Malformed GitHub release response for ${REPO}: missing tag_name`);
+	}
+	const version = data.tag_name.replace(/^v/, "");
 	return {
-		tag: `v${latest.version}`,
-		version: latest.version,
-		dist: resolveReleaseDist(latest.manifest),
-		packages,
-		registry: registry.url,
+		tag: `v${version}`,
+		version,
+		dist: "binary",
+		packages: { ...CURRENT_PACKAGES },
 	};
 }
 
