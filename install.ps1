@@ -70,7 +70,7 @@ if (-not $Version) {
 }
 Sayf "-> Selected version: {0}" "-> Versao selecionada: {0}" $Version
 
-$asset = "omp-win32-$arch.exe"
+$asset = "omp-windows-$arch.exe"
 $base = "https://github.com/$Repo/releases/download/v$Version"
 
 # --- stop running instances so the binary file is not locked ---
