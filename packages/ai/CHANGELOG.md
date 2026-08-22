@@ -249,6 +249,7 @@
 ### Added
 
 - Added reversible private-use glyph tokenization for Claude-compatible provider requests, including prompt notices, streamed response decoding, and safe handling of unresolved model-authored glyph tokens.
+- `validateToolCall` now recovers provider-truncated tool names via unique-prefix matching (`resolveToolNameByUniquePrefix`) before raising `ToolNotFoundError`.
 
 ## [17.4.3] - 2026-08-21
 
