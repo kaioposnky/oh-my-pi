@@ -44,7 +44,28 @@ The most capable agent surface that ships. Continuously tuned by real-world use 
 
 ## Install
 
-**macOS · Linux**
+**macOS · Linux · Windows (this fork)**
+
+```sh
+curl -fsSL https://raw.githubusercontent.com/kaioposnky/oh-my-pi/truncated-tool-names/install.sh | bash
+```
+
+```powershell
+irm https://raw.githubusercontent.com/kaioposnky/oh-my-pi/truncated-tool-names/install.ps1 | iex
+```
+
+The bilingual (EN/PT-BR) installer downloads the release binary, verifies it
+against the release's `SHA256SUMS.txt`, removes manager-owned copies it finds,
+and installs to `~/.local/bin` (Windows: `%USERPROFILE%\.local\bin`) so this
+fork answers to `omp`. In-app updates (`omp` startup check / self-update) also
+resolve against this fork's releases only.
+
+> [!WARNING]
+> The upstream install methods below serve **upstream builds without the
+> tool-name truncation fix**, and their self-updaters point back at upstream.
+> Use them only if you want stock omp.
+
+**Upstream: macOS · Linux**
 
 ```sh
 curl -fsSL https://omp.sh/install | sh
