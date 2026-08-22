@@ -707,6 +707,10 @@
 - Context file containment dedup now sorts by depth descending internally, treating files without a depth as least authoritative, so concatenated multi-root or user-level context cannot drop a closer-to-cwd file.
 - Paragraph splitting for containment comparison is now fenced-code-block-aware: text inside a fenced example in a more authoritative file no longer counts as a contained instruction, preventing active context rules from being discarded.
 
+### Changed
+
+- Updates now resolve against this fork's GitHub releases (`kaioposnky/oh-my-pi`) over the digest-verified binary channel instead of querying npm, so fork installs are never pointed at upstream builds.
+
 ### Fixed
 
 - Fixed UI jitter in the edit tool gutter by reserving space for line counts
