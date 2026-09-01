@@ -148,7 +148,7 @@ export interface ThinkingConfig {
 	 * efforts the map omits. Used by Anthropic adaptive thinking, OpenAI-
 	 * compatible `reasoning_effort`, and Responses-style reasoning params.
 	 */
-	effortMap?: Partial<Record<Effort, string>>;
+	effortMap?: Partial<Record<Effort, string | number>>;
 	/**
 	 * Adaptive thinking accepts the `display` field (Opus 4.7+, Fable/Mythos
 	 * 5). Also implies native interleaved thinking — no beta header needed.
@@ -323,7 +323,7 @@ export interface OpenAICompat {
 	/** Do not infer a thinking dial when discovery supplies no explicit thinking configuration. */
 	trustExplicitThinkingOnly?: boolean;
 	/** Optional mapping from pi-ai reasoning levels to provider/model-specific `reasoning_effort` values. */
-	reasoningEffortMap?: Partial<Record<Effort, string>>;
+	reasoningEffortMap?: Partial<Record<Effort, string | number>>;
 	/** Whether the provider supports `stream_options: { include_usage: true }` for token usage in streaming responses. Default: true. */
 	supportsUsageInStreaming?: boolean;
 	/** Which field to use for max tokens. Default: auto-detected from URL. */
@@ -924,7 +924,7 @@ export interface ResolvedOpenAISharedCompat {
 	supportsStrictMode: boolean;
 	supportsReasoningEffort: boolean;
 	trustExplicitThinkingOnly?: boolean;
-	reasoningEffortMap: Partial<Record<Effort, string>>;
+	reasoningEffortMap: Partial<Record<Effort, string | number>>;
 	supportsReasoningParams: boolean;
 	supportsSamplingParams: boolean;
 	supportsPenaltyAndStopParams: boolean;
