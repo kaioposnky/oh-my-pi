@@ -423,15 +423,15 @@ const RESPONSES_STABLE_EFFORTS: Record<ResponsesStableEffort, true> = {
 	max: true,
 };
 
-function isResponsesStableEffort(effort: string): effort is ResponsesStableEffort {
-	return Object.hasOwn(RESPONSES_STABLE_EFFORTS, effort);
+function isResponsesStableEffort(effort: string | number): effort is ResponsesStableEffort {
+	return typeof effort === "string" && Object.hasOwn(RESPONSES_STABLE_EFFORTS, effort);
 }
 
 /** Wire `reasoning.effort` for `level` on this model: catalog effort maps first, else the level itself. */
 function mapResponsesEffort(
 	model: Model<"openai-responses">,
 	level: Effort | NonNullable<OpenAIResponsesOptions["reasoning"]>,
-): string {
+): string | number {
 	return model.compat.reasoningEffortMap?.[level] ?? model.thinking?.effortMap?.[level] ?? level;
 }
 
