@@ -54,6 +54,9 @@ export const UNSUPPORTED_SCHEMA_FIELDS: Record<string, true> = {
 	readOnly: true,
 	writeOnly: true,
 	$comment: true,
+	"x-google-enum-deprecated": true,
+	"x-google-enum-descriptions": true,
+	"x-google-identifier": true,
 };
 
 /**
