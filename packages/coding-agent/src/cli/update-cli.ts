@@ -90,7 +90,10 @@ export interface ReleaseRename {
 	natives?: string;
 }
 
-const CURRENT_PACKAGES: ReleasePackages = { pkg: PACKAGE, natives: NATIVES_PACKAGE };
+const CURRENT_PACKAGES: ReleasePackages = {
+	pkg: PACKAGE,
+	natives: NATIVES_PACKAGE,
+};
 
 export interface ReleaseInfo {
 	tag: string;
@@ -307,7 +310,9 @@ async function getReleaseBinaryAsset(
 		});
 	} catch (err) {
 		if (isTimeoutError(err)) {
-			throw new Error("Timed out fetching GitHub release metadata after 30s", { cause: err });
+			throw new Error("Timed out fetching GitHub release metadata after 30s", {
+				cause: err,
+			});
 		}
 		if (isUnsupportedProxyError(err)) throw new Error(unsupportedProxyMessage(), { cause: err });
 		throw err;
@@ -321,7 +326,9 @@ async function getReleaseBinaryAsset(
 		throw new Error(`Failed to fetch GitHub release metadata: ${response.statusText}`);
 	}
 
-	return resolveReleaseBinaryAsset(await response.json(), tag, binaryName, { allowPrerelease });
+	return resolveReleaseBinaryAsset(await response.json(), tag, binaryName, {
+		allowPrerelease,
+	});
 }
 
 export interface VerifiedBinaryDownloadOptions {
@@ -347,7 +354,9 @@ export async function downloadVerifiedBinary(options: VerifiedBinaryDownloadOpti
 		});
 	} catch (err) {
 		if (isTimeoutError(err)) {
-			throw new Error("Timed out downloading release binary after 15 minutes", { cause: err });
+			throw new Error("Timed out downloading release binary after 15 minutes", {
+				cause: err,
+			});
 		}
 		if (isUnsupportedProxyError(err)) throw new Error(unsupportedProxyMessage(), { cause: err });
 		throw err;
@@ -387,7 +396,9 @@ export async function downloadVerifiedBinary(options: VerifiedBinaryDownloadOpti
 	} catch (err) {
 		await unlinkIfExists(options.targetPath);
 		if (isTimeoutError(err)) {
-			throw new Error("Timed out downloading release binary after 15 minutes", { cause: err });
+			throw new Error("Timed out downloading release binary after 15 minutes", {
+				cause: err,
+			});
 		}
 		if (isUnsupportedProxyError(err)) throw new Error(unsupportedProxyMessage(), { cause: err });
 		throw err;
@@ -414,9 +425,14 @@ export interface BinaryReplacementOptions {
  * Parse update subcommand arguments.
  * Returns undefined if not an update command.
  */
-export function parseUpdateArgs(
-	args: string[],
-): { force: boolean; check: boolean; plugins: boolean; channel?: UpdateChannel } | undefined {
+export function parseUpdateArgs(args: string[]):
+	| {
+			force: boolean;
+			check: boolean;
+			plugins: boolean;
+			channel?: UpdateChannel;
+	  }
+	| undefined {
 	if (args.length === 0 || args[0] !== "update") {
 		return undefined;
 	}
@@ -812,7 +828,14 @@ async function resolveUpdateTarget(options: { allowPackageManagers: boolean }): 
  * platform binary from `${REPO}` releases and verifies it against GitHub's
  * per-asset SHA-256 digest before replacing the installed binary.
  */
-export async function getLatestRelease(options: { timeoutMs?: number } = {}): Promise<ReleaseInfo> {
+export async function getLatestRelease(
+	options: { timeoutMs?: number; channel?: UpdateChannel } = {},
+): Promise<ReleaseInfo> {
+	if (options.channel === "canary") {
+		throw new Error(
+			`The ${REPO} binary release channel does not publish canary builds. Use \`${APP_NAME} update --stable\`.`,
+		);
+	}
 	const timeoutMs = options.timeoutMs ?? RELEASE_METADATA_TIMEOUT_MS;
 	let response: Response;
 	try {
@@ -1086,7 +1109,10 @@ interface MuslDetectionOptions {
 
 function detectLddOutput(): string | undefined {
 	try {
-		const result = Bun.spawnSync(["ldd", "--version"], { stdout: "pipe", stderr: "pipe" });
+		const result = Bun.spawnSync(["ldd", "--version"], {
+			stdout: "pipe",
+			stderr: "pipe",
+		});
 		return `${result.stdout.toString("utf-8")}\n${result.stderr.toString("utf-8")}`;
 	} catch {
 		return undefined;
@@ -1671,9 +1697,13 @@ function packageManagerUpdateSteps(
 			// npm's script shims outrank `.exe` in PowerShell and Git Bash, so
 			// they must be retired rather than merely shadowed.
 			if (isWindowsScriptLauncherPath(launcherPath)) {
-				await updateViaShimTakeover(launcherPath, release.version, { allowPrerelease });
+				await updateViaShimTakeover(launcherPath, release.version, {
+					allowPrerelease,
+				});
 			} else {
-				await updateViaBinaryAt(launcherPath, release.version, { allowPrerelease });
+				await updateViaBinaryAt(launcherPath, release.version, {
+					allowPrerelease,
+				});
 			}
 		},
 	};
@@ -2091,7 +2121,9 @@ export async function runUpdateCommand(opts: {
 	try {
 		const forceBinary = shouldForceBinaryUpdate(release);
 		const allowPrerelease = channel === "canary";
-		const target = await resolveUpdateTarget({ allowPackageManagers: !forceBinary });
+		const target = await resolveUpdateTarget({
+			allowPackageManagers: !forceBinary,
+		});
 		if (channel === "canary" && (target.method === "nix" || target.method === "brew" || target.method === "mise")) {
 			console.log(chalk.yellow("Canary updates are only supported for bun, npm, or binary installs."));
 			return;
@@ -2111,7 +2143,9 @@ export async function runUpdateCommand(opts: {
 				// skipped), so the launcher path is always known.
 				if (!target.path) throw new Error(`Could not resolve ${APP_NAME} launcher path in PATH`);
 				console.log(chalk.dim("This release ships as a standalone binary; replacing the script launcher."));
-				await updateViaShimTakeover(target.path, release.version, { allowPrerelease });
+				await updateViaShimTakeover(target.path, release.version, {
+					allowPrerelease,
+				});
 				console.log(
 					chalk.yellow(
 						`This install is no longer managed by ${target.method}. Removing the old global package may delete this launcher; if it does, reinstall with: ${installerHint()}`,

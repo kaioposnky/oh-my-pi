@@ -64,14 +64,8 @@ describe("getLatestRelease fork releases", () => {
 		});
 		expect(urls).toEqual(["https://api.github.com/repos/kaioposnky/oh-my-pi/releases/latest"]);
 	});
-	it("fetches the canary dist-tag when checking the canary channel", async () => {
-		const urls = stubRegistry({
-			"@oh-my-pi/pi-coding-agent": { version: "999.0.0-canary.1" },
-		});
-
-		await getLatestRelease({ channel: "canary" });
-
-		expect(urls).toEqual(["https://registry.npmjs.org/@oh-my-pi/pi-coding-agent/canary"]);
+	it("rejects the canary channel because the fork publishes stable GitHub binaries only", async () => {
+		await expect(getLatestRelease({ channel: "canary" })).rejects.toThrow(/does not publish canary builds/);
 	});
 
 	it("strips a v prefix from release tags that already carry it", async () => {
