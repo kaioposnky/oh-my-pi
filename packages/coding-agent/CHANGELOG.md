@@ -1727,6 +1727,8 @@ Older entries are archived in [packages/coding-agent/CHANGELOG.md@47b1156699bb](
 ### Removed
 
 - Removed the librarian agent.
+- Fork builds now report that canary updates are unavailable instead of attempting the upstream npm channel; stable updates continue through verified GitHub release binaries.
+- Fixed two idle subagents exchanging a single IRC message ping-ponging forever: wake-turn relays are now tagged and never relayed back, so each automated relay is delivered exactly once instead of waking a reciprocal relay until manual cancellation.
 
 ## [18.1.8] - 2026-09-03
 
