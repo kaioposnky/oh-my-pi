@@ -215,6 +215,7 @@
 
 ### Fixed
 
+- Fixed Google Cloud Code Assist and Antigravity rejecting tool schemas containing Google extension annotations (`x-google-enum-deprecated`, `x-google-enum-descriptions`, `x-google-identifier`) with HTTP 400 `Cannot find field` errors.
 - Captured bounded Devin Connect trailer details and request-shape evidence for diagnosing intermittent `invalid_argument` stream rejections ([#4218](https://github.com/can1357/oh-my-pi/issues/4218)).
 - Fixed abandoned `auth-broker-snapshot.enc.*.tmp` files accumulating in the cache directory when a process exited mid-write; stale temp files are now swept on each cache write.
 - Fixed Cursor GPT effort models failing with `not_found` on accounts that require the discovered effort-specific model id ([#9287](https://github.com/can1357/oh-my-pi/issues/9287)).

@@ -986,6 +986,28 @@ describe("normalizeSchemaForCCA", () => {
 		});
 	});
 
+	it("strips Google-specific extension annotations that Cloud Code Assist rejects", () => {
+		const sanitized = normalizeSchemaForCCA({
+			type: "object",
+			properties: {
+				mode: {
+					type: "string",
+					enum: ["fast", "safe"],
+					"x-google-enum-deprecated": [false, false],
+					"x-google-enum-descriptions": ["Fast mode", "Safe mode"],
+					"x-google-identifier": "mode",
+				},
+			},
+		});
+
+		expect(sanitized).toEqual({
+			type: "object",
+			properties: {
+				mode: { type: "string", enum: ["fast", "safe"] },
+			},
+		});
+	});
+
 	it("lifts stripped validation keywords into description", () => {
 		const normalized = normalizeSchemaForCCA({
 			type: "string",
