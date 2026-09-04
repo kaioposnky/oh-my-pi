@@ -4,6 +4,8 @@ import type { ModelRegistry } from "@oh-my-pi/pi-coding-agent/config/model-regis
 import type { CustomToolContext } from "@oh-my-pi/pi-coding-agent/extensibility/custom-tools";
 import type { ReadonlySessionManager } from "@oh-my-pi/pi-coding-agent/session/session-manager";
 import {
+	DEFAULT_ANTIGRAVITY_MODEL,
+	getAntigravityImageModel,
 	getImageGenTools,
 	getImageGenToolsWithRegistry,
 	imageGenTool,
@@ -940,5 +942,10 @@ describe("imageGenTool", () => {
 		).rejects.toThrow("deepinfra image generation is text-to-image only and cannot edit input images");
 		// DeepInfra was credentialed but must not receive the edit request.
 		expect(requestUrls).toEqual([]);
+	});
+
+	it("resolves the default Antigravity image model and honors setting/env overrides", () => {
+		expect(DEFAULT_ANTIGRAVITY_MODEL).toBe("gemini-3.1-flash-image");
+		expect(getAntigravityImageModel()).toBe("gemini-3.1-flash-image");
 	});
 });

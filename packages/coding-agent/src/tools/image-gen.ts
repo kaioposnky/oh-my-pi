@@ -42,7 +42,7 @@ import { resolveReadPath } from "./path-utils";
 
 const DEFAULT_MODEL = "gemini-3-pro-image-preview";
 const DEFAULT_OPENROUTER_MODEL = "google/gemini-3-pro-image-preview";
-const DEFAULT_ANTIGRAVITY_MODEL = "gemini-3-pro-image";
+const DEFAULT_ANTIGRAVITY_MODEL = "gemini-3.1-flash-image";
 const DEFAULT_XAI_IMAGE_MODEL = "grok-imagine-image";
 const DEFAULT_DEEPINFRA_IMAGE_MODEL = "black-forest-labs/FLUX-2-pro";
 const DEEPINFRA_IMAGES_URL = "https://api.deepinfra.com/v1/openai/images/generations";
@@ -56,6 +56,22 @@ const DEFAULT_ANTIGRAVITY_ENDPOINT_PROD = "https://daily-cloudcode-pa.googleapis
 const DEFAULT_ANTIGRAVITY_ENDPOINT_SANDBOX = "https://daily-cloudcode-pa.sandbox.googleapis.com";
 const IMAGE_SYSTEM_INSTRUCTION =
 	"You are an AI image generator. Generate images based on user descriptions. Focus on creating high-quality, visually appealing images that match the user's request.";
+
+export function getAntigravityImageModel(): string {
+	const envModel = $env.PI_ANTIGRAVITY_IMAGE_MODEL ?? $env.ANTIGRAVITY_IMAGE_MODEL;
+	if (envModel && envModel.trim().length > 0) return envModel.trim();
+	try {
+		const configured = settings.get("providers.imageAntigravityModel");
+		if (typeof configured === "string" && configured.trim().length > 0) {
+			return configured.trim();
+		}
+	} catch {
+		// Tolerate uninitialized settings
+	}
+	return DEFAULT_ANTIGRAVITY_MODEL;
+}
+
+export { DEFAULT_ANTIGRAVITY_MODEL };
 
 export type { ImageProvider } from "./image-providers";
 export type ImageProviderPreference = ImageProvider | "auto";
@@ -593,7 +609,7 @@ async function findAntigravityCredentials(
 	sessionId?: string,
 ): Promise<ImageApiKey | null> {
 	const apiKey = await modelRegistry.getApiKeyForProvider("google-antigravity", sessionId, {
-		modelId: DEFAULT_ANTIGRAVITY_MODEL,
+		modelId: getAntigravityImageModel(),
 	});
 	if (!apiKey) return null;
 
@@ -1261,7 +1277,7 @@ export const imageGenTool: CustomTool<typeof imageGenSchema, ImageGenToolDetails
 						provider === "openai" || provider === "openai-codex"
 							? (apiKey.model?.id ?? "gpt")
 							: provider === "antigravity"
-								? DEFAULT_ANTIGRAVITY_MODEL
+								? getAntigravityImageModel()
 								: provider === "openrouter"
 									? DEFAULT_OPENROUTER_MODEL
 									: provider === "xai"
@@ -1345,7 +1361,7 @@ export const imageGenTool: CustomTool<typeof imageGenSchema, ImageGenToolDetails
 						const prompt = assemblePrompt(params);
 						const antigravityKey: ApiKey = ctx.modelRegistry.resolver("google-antigravity", {
 							sessionId,
-							modelId: DEFAULT_ANTIGRAVITY_MODEL,
+							modelId: getAntigravityImageModel(),
 						});
 
 						const response = await withAuth(
