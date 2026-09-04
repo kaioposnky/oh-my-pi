@@ -5464,6 +5464,16 @@ export const SETTINGS_SCHEMA = {
 			ordered: true,
 		},
 	},
+	"providers.imageAntigravityModel": {
+		type: "string",
+		default: undefined,
+		ui: {
+			tab: "providers",
+			group: "Services",
+			label: "Antigravity Image Model",
+			description: "Model ID for Google Antigravity image generation. Defaults to gemini-3.1-flash-image.",
+		},
+	},
 	"providers.fireworksTier": {
 		type: "enum",
 		values: ["standard", "priority"] as const,
