@@ -772,6 +772,7 @@ describe("imageGenTool", () => {
 		generatedImagePaths.push(...(result.details?.imagePaths ?? []));
 
 		expect(requestUrls).toEqual([
+			"https://daily-cloudcode-pa.googleapis.com/v1internal:loadCodeAssist",
 			"https://daily-cloudcode-pa.googleapis.com/v1internal:streamGenerateContent?alt=sse",
 			"https://api.x.ai/v1/images/generations",
 		]);

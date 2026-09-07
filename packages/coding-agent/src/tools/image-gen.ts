@@ -604,6 +604,49 @@ function parseAntigravityCredentials(raw: string): ParsedAntigravityCredentials 
 	return null;
 }
 
+const ANTIGRAVITY_LOAD_CODE_ASSIST_URL = `${DEFAULT_ANTIGRAVITY_ENDPOINT_PROD}/v1internal:loadCodeAssist`;
+const ANTIGRAVITY_IMAGE_PROJECT_TTL_MS = 10 * 60 * 1000;
+
+let antigravityImageProjectCache: { projectId: string; expiresAt: number } | undefined;
+
+/**
+ * Resolve the Cloud Code Assist project that actually backs image generation for
+ * the current OAuth token. The stored credential's projectId can point at a GCP
+ * project without the `cloudaicompanion` license while `loadCodeAssist` reports
+ * the consumer project that does (403 SUBSCRIPTION_REQUIRED vs 200).
+ */
+async function resolveAntigravityImageProject(fetchImpl: FetchImpl, bearer: string, fallback: string): Promise<string> {
+	const now = Date.now();
+	if (antigravityImageProjectCache && antigravityImageProjectCache.expiresAt > now) {
+		return antigravityImageProjectCache.projectId;
+	}
+	try {
+		const resp = await fetchImpl(ANTIGRAVITY_LOAD_CODE_ASSIST_URL, {
+			method: "POST",
+			headers: {
+				Authorization: `Bearer ${bearer}`,
+				"Content-Type": "application/json",
+				"User-Agent": getAntigravityUserAgent(),
+			},
+			body: JSON.stringify({ metadata: { ideType: "ANTIGRAVITY" } }),
+		});
+		if (resp.ok) {
+			const payload = (await resp.json()) as { cloudaicompanionProject?: string };
+			const projectId = payload.cloudaicompanionProject;
+			if (projectId && projectId.length > 0) {
+				antigravityImageProjectCache = {
+					projectId,
+					expiresAt: now + ANTIGRAVITY_IMAGE_PROJECT_TTL_MS,
+				};
+				return projectId;
+			}
+		}
+	} catch {
+		// Discovery is best-effort; the stored credential project remains the fallback.
+	}
+	return fallback;
+}
+
 async function findAntigravityCredentials(
 	modelRegistry: ModelRegistry,
 	sessionId?: string,
@@ -1372,7 +1415,11 @@ export const imageGenTool: CustomTool<typeof imageGenSchema, ImageGenToolDetails
 								// access token. Tolerate both, falling back to the seed projectId.
 								const rotated = parseAntigravityCredentials(key);
 								const bearer = rotated?.accessToken ?? key;
-								const projectId = rotated?.projectId ?? apiKey.projectId!;
+								const projectId = await resolveAntigravityImageProject(
+									fetchImpl,
+									bearer,
+									rotated?.projectId ?? apiKey.projectId!,
+								);
 								const requestBody = buildAntigravityRequest(
 									prompt,
 									model,
