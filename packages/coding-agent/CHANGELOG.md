@@ -84,6 +84,7 @@
 ### Fixed
 
 - Fixed `todo` and other tools called through eval rejecting optional `None`/`null` arguments that direct tool calls accept.
+- Fixed Antigravity image generation failing with 403 `SUBSCRIPTION_REQUIRED` when the stored credential's `projectId` lacks a Cloud Code Assist license: the image tool now resolves the project via `v1internal:loadCodeAssist` (10-minute cache, falls back to the stored `projectId`).
 - Report oversized selected lines that cannot fit after read context, with a working raw recovery selector instead of a looping continuation hint ([#10775](https://github.com/can1357/oh-my-pi/issues/10775)).
 - Fixed WorkPool child sessions crashing during startup while constructing their incremental `yield` tool schema.
 - Commit summaries written in Vietnamese, Korean, and other accented scripts are no longer rejected for exceeding the length limit, and keep their accents as typed.
