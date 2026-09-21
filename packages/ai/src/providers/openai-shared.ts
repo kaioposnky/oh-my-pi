@@ -798,18 +798,18 @@ export type OpenAICompletionsParams = Omit<ChatCompletionCreateParamsStreaming, 
 	top_k?: number;
 	min_p?: number;
 	repetition_penalty?: number;
-	thinking?: { type: "enabled" | "disabled"; effort?: string; keep?: "all" };
+	thinking?: { type: "enabled" | "disabled"; effort?: string | number; keep?: "all" };
 	enable_thinking?: boolean;
 	preserve_thinking?: boolean;
 	chat_template_kwargs?: {
 		enable_thinking?: boolean;
 		thinking?: boolean;
 		preserve_thinking?: boolean;
-		reasoning_effort?: string;
+		reasoning_effort?: string | number;
 	};
-	reasoning?: { effort?: string; enabled?: boolean; max_tokens?: number };
+	reasoning?: { effort?: string | number; enabled?: boolean; max_tokens?: number };
 	venice_parameters?: { disable_thinking?: boolean; [key: string]: unknown };
-	reasoning_effort?: string | null;
+	reasoning_effort?: string | number | null;
 	service_tier?: ServiceTier;
 	tool_stream?: boolean;
 	provider?: OpenAICompat["openRouterRouting"];
@@ -851,7 +851,7 @@ export interface OpenAICompatPolicy {
 		modelSupported: boolean;
 		supportsParams: boolean;
 		requestedEffort?: string;
-		wireEffort?: string;
+		wireEffort?: string | number;
 		enabled: boolean;
 		disabled: boolean;
 		disableReason?: OpenAIReasoningDisableReason;
@@ -891,9 +891,9 @@ export interface OpenAICompatPolicy {
  */
 export function mapOpenAIReasoningEffort(
 	model: Pick<Model, "thinking">,
-	compat: { reasoningEffortMap?: Partial<Record<Effort, string>> } | undefined,
+	compat: { reasoningEffortMap?: Partial<Record<Effort, string | number>> } | undefined,
 	effort: string,
-): string {
+): string | number {
 	const level = effort as Effort;
 	return compat?.reasoningEffortMap?.[level] ?? model.thinking?.effortMap?.[level] ?? effort;
 }
@@ -1185,7 +1185,7 @@ export function applyChatCompletionsCompatPolicy(params: OpenAICompletionsParams
 				break;
 			case "openrouter-enabled-false":
 				if (reasoning.wireEffort !== undefined) {
-					(params as typeof params & { reasoning?: { effort?: string } }).reasoning = {
+					(params as typeof params & { reasoning?: { effort?: string | number } }).reasoning = {
 						effort: reasoning.wireEffort,
 					};
 				}
@@ -3786,7 +3786,7 @@ export function resolveReasoningSummaryOption(
 
 export interface ApplyResponsesCompatPolicyOptions {
 	reasoningSummary?: "auto" | "detailed" | "concise" | null;
-	mapEffort?: (effort: string) => string;
+	mapEffort?: (effort: string) => string | number;
 	/**
 	 * Suppress native reasoning by sending `reasoning.effort: "none"` — the only
 	 * disable level the Responses API defines (`"off"` is not a wire value and
@@ -3863,7 +3863,7 @@ export function applyResponsesReasoningParams<P extends ResponseCreateParamsStre
 	params: P,
 	model: Model<"openai-responses" | "azure-openai-responses" | "openai-codex-responses">,
 	options: ReasoningOptions | undefined,
-	mapEffort?: (effort: string) => string,
+	mapEffort?: (effort: string) => string | number,
 	includeEncryptedReasoning?: boolean,
 	omitReasoningEffort?: boolean,
 ): void {
