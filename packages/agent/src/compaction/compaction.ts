@@ -1522,7 +1522,7 @@ function buildOpenAiResponsesCompactionInput(
 function buildCompactionV2Reasoning(
 	model: Model<"openai-responses" | "azure-openai-responses" | "openai-codex-responses">,
 	thinkingLevel: ThinkingLevel | undefined,
-): { effort: string; summary: string } | undefined {
+): { effort: string | number; summary: string } | undefined {
 	const policy = resolveOpenAICompatPolicy(model, {
 		endpoint: "responses",
 		reasoning: resolveCompactionEffort(model, thinkingLevel),
