@@ -1760,12 +1760,12 @@ function mapOpenAiToolChoice(choice?: ToolChoice): OpenAICompletionsOptions["too
 }
 
 type ReasoningEffortMapCompat = {
-	reasoningEffortMap?: Partial<Record<Effort, string>>;
+	reasoningEffortMap?: Partial<Record<Effort, string | number>>;
 };
 
 function getCompatReasoningEffortMap<TApi extends Api>(
 	model: Model<TApi>,
-): Partial<Record<Effort, string>> | undefined {
+): Partial<Record<Effort, string | number>> | undefined {
 	const compat = model.compat;
 	if (compat === undefined || typeof compat !== "object" || !("reasoningEffortMap" in compat)) {
 		return undefined;
