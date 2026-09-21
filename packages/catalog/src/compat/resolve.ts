@@ -144,7 +144,7 @@ function applyWireAxes(compat: object, wire: Record<string, unknown>, api: Api):
  * overrides overlay it key by key (spec keys win, unseen keys survive).
  */
 function overlayEffortMapAxis(
-	compat: { reasoningEffortMap: Partial<Record<Effort, string>> },
+	compat: { reasoningEffortMap: Partial<Record<Effort, string | number>> },
 	axes: ResolvedAxes,
 	specCompat: OpenAICompat | undefined,
 ): void {
@@ -173,14 +173,16 @@ function objectPayload(value: unknown): object | undefined {
 	return typeof value === "object" && value !== null && !Array.isArray(value) ? value : undefined;
 }
 
-function effortRecord(value: unknown): Partial<Record<Effort, string>> | undefined {
+function effortRecord(value: unknown): Partial<Record<Effort, string | number>> | undefined {
 	if (typeof value !== "object" || value === null) return undefined;
-	const out: Partial<Record<Effort, string>> = {};
+	const out: Partial<Record<Effort, string | number>> = {};
 	let any = false;
 	for (const key in value) {
 		const effort = effortValue(key);
 		const mapped: unknown = Reflect.get(value, key);
-		if (effort === undefined || typeof mapped !== "string") continue;
+		// Accept numbers too: providers with an integer intensity scale (e.g.
+		// Verboo/DeepSeek-V4.1-Flash, 1-100) map effort levels to numbers.
+		if (effort === undefined || (typeof mapped !== "string" && typeof mapped !== "number")) continue;
 		out[effort] = mapped;
 		any = true;
 	}
@@ -934,13 +936,13 @@ function omitsWireReasoningEffort(api: Api, compat: CompatOf<Api>): boolean {
 	return compat !== undefined && "supportsReasoningEffort" in compat && compat.supportsReasoningEffort === false;
 }
 
-function readCompatEffortMap(compat: CompatOf<Api>): Partial<Record<Effort, string>> | undefined {
+function readCompatEffortMap(compat: CompatOf<Api>): Partial<Record<Effort, string | number>> | undefined {
 	if (compat === undefined || !("reasoningEffortMap" in compat)) return undefined;
 	const map = compat.reasoningEffortMap;
 	return map && Object.keys(map).length > 0 ? map : undefined;
 }
 /** Host-quirk effort remaps detected outside the rules (URL/API compounds). */
-const FIREWORKS_THINKING_EFFORT_MAP: Readonly<Partial<Record<Effort, string>>> = {
+const FIREWORKS_THINKING_EFFORT_MAP: Readonly<Partial<Record<Effort, string | number>>> = {
 	[Effort.Minimal]: "none",
 };
 
@@ -998,10 +1000,10 @@ function fallbackEfforts<TApi extends Api>(spec: ModelSpec<TApi>, compat: Compat
 }
 
 function filterEffortMap(
-	map: Partial<Record<Effort, string>>,
+	map: Partial<Record<Effort, string | number>>,
 	efforts: readonly Effort[],
-): Partial<Record<Effort, string>> | undefined {
-	let filtered: Partial<Record<Effort, string>> | undefined;
+): Partial<Record<Effort, string | number>> | undefined {
+	let filtered: Partial<Record<Effort, string | number>> | undefined;
 	for (const effort of efforts) {
 		const mapped = map[effort];
 		if (mapped === undefined) continue;
@@ -1015,7 +1017,7 @@ interface RuleThinking {
 	mode?: ThinkingConfig["mode"];
 	efforts?: readonly Effort[];
 	defaultLevel?: Effort;
-	effortMap?: Partial<Record<Effort, string>>;
+	effortMap?: Partial<Record<Effort, string | number>>;
 	effortBudgets?: Partial<Record<Effort, number>>;
 	requiresEffort?: boolean;
 	suppressWhenOff?: boolean;
@@ -1117,10 +1119,10 @@ function defaultSupportsDisplay<TApi extends Api>(spec: ModelSpec<TApi>, facts: 
 
 function mergeEffortMap(
 	spec: ModelSpec<Api>,
-	ruleMap: Partial<Record<Effort, string>> | undefined,
+	ruleMap: Partial<Record<Effort, string | number>> | undefined,
 	compat: CompatOf<Api>,
 	efforts: readonly Effort[],
-): Partial<Record<Effort, string>> | undefined {
+): Partial<Record<Effort, string | number>> | undefined {
 	const detected =
 		(spec.api === "openai-completions" || spec.api === "openrouter") &&
 		modelMatchesHost({ provider: spec.provider, baseUrl: spec.baseUrl ?? "" }, "fireworks")
