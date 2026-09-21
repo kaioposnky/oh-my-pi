@@ -195,7 +195,7 @@ export function buildCompactionV2Request(
 	instructions: string,
 	options?: {
 		tools?: unknown[];
-		reasoning?: { effort: string; summary: string };
+		reasoning?: { effort: string | number; summary: string };
 		sessionId?: string;
 		promptCacheKey?: string;
 		retainedMessageBudget?: number;

@@ -12,13 +12,16 @@ export const getModelsConfigSchemaBundle = once(() => {
 		"order?": "string[]",
 	});
 
+	// Values may be strings (`"low"`) or integers (`25`) — some providers
+	// (DeepSeek-V4.1-Flash on Verboo) take a 1-100 integer intensity scale
+	// rather than the OpenAI effort vocabulary.
 	const ReasoningEffortMapSchema = type({
-		"minimal?": "string",
-		"low?": "string",
-		"medium?": "string",
-		"high?": "string",
-		"xhigh?": "string",
-		"max?": "string",
+		"minimal?": "string | number",
+		"low?": "string | number",
+		"medium?": "string | number",
+		"high?": "string | number",
+		"xhigh?": "string | number",
+		"max?": "string | number",
 	});
 
 	const OpenAICompatFields = {
