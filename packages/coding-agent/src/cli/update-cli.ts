@@ -861,6 +861,10 @@ export async function getLatestRelease(
 		version,
 		dist: "binary",
 		packages: { ...CURRENT_PACKAGES },
+		// Fork releases are binary-only, so no registry was consulted. The
+		// field is required by `ReleaseInfo` and read only by the bun/npm
+		// install paths, which `dist: "binary"` never reaches.
+		registry: DEFAULT_NPM_REGISTRY,
 	};
 }
 
