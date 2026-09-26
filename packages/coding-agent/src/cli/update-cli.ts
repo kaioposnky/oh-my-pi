@@ -27,7 +27,7 @@ import { cfgUpdateChannel } from "../modes/settings";
 
 // Fork redirect: updates resolve against the kaioposnky/oh-my-pi fork so users
 // of the fixed build never pull (or are nagged toward) upstream builds.
-const REPO = "kaioposnky/oh-my-pi";
+export const REPO = "kaioposnky/oh-my-pi";
 const PACKAGE = "@oh-my-pi/pi-coding-agent";
 const HOMEBREW_FORMULA = "can1357/tap/omp";
 const MISE_TOOL = "github:can1357/oh-my-pi";
