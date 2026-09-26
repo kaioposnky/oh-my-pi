@@ -25,6 +25,7 @@ import {
 	type ReleaseInfo,
 	type RenameMigrationSteps,
 	replaceBinaryForUpdate,
+	REPO,
 	resolveBunGlobalNodeModulesDirFromLocations,
 	resolveReleaseDist,
 	resolveReleaseRename,
