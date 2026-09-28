@@ -91,9 +91,7 @@ describe("truncated tool-call name recovery", () => {
 
 		expect(executed).toEqual([]);
 		const assistant = agent.state.messages.find(message => message.role === "assistant");
-		const result = agent.state.messages.find(
-			message => message.role === "toolResult" || (message as { role?: string }).role === "toolResult",
-		);
+		const result = agent.state.messages.find(message => message.role === "toolResult");
 		const text = JSON.stringify(result ?? assistant ?? {});
 		expect(text).toContain("not found");
 	});
