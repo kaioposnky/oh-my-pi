@@ -2,6 +2,10 @@
 
 ## [Unreleased]
 
+### Fixed
+
+- Fixed Antigravity image generation failing with 403 `SUBSCRIPTION_REQUIRED` when the stored credential's `projectId` lacks a Cloud Code Assist license: the image request now carries the `cloudaicompanionProject` reported by `v1internal:loadCodeAssist`, falling back to the stored project when discovery fails.
+
 ## [18.3.5] - 2026-09-27
 
 ### Breaking Changes
