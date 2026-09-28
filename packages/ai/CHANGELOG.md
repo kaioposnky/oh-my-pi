@@ -158,6 +158,9 @@
 - Fixed fetch requests over Unix sockets when `PI_PROXY` is configured.
 - Fixed Ollama chat turns being recorded with zero cost; usage is now priced using the model’s cost information.
 - Fixed Anthropic requests failing after native compaction when per-message effort settings were present; effort controls are now handled correctly with compaction.
+### Fixed
+
+- Fixed Antigravity image generation failing with 403 `SUBSCRIPTION_REQUIRED` when the stored credential's `projectId` lacks a Cloud Code Assist license: the image request now carries the `cloudaicompanionProject` reported by `v1internal:loadCodeAssist`, falling back to the stored project when discovery fails.
 
 ## [18.3.5] - 2026-09-27
 
