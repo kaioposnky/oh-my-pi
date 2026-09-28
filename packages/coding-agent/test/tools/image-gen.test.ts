@@ -343,6 +343,8 @@ describe("imageGenTool catalog routing", () => {
 			if (url.endsWith("/v1internal:fetchAvailableModels")) {
 				return new Response(JSON.stringify({ imageGenerationModelIds: [] }), { status: 200 });
 			}
+			// Fork: image project resolution probes loadCodeAssist first; no project → credential fallback.
+			if (url.endsWith("/v1internal:loadCodeAssist")) return new Response("{}", { status: 200 });
 			requestBodies.push(JSON.parse(String(init?.body)));
 			return new Response(
 				`data: ${JSON.stringify({ response: { candidates: [{ content: { role: "model", parts: [{ inlineData: { data: PNG_DATA, mimeType: "image/png" } }] } }] } })}\n\n`,
