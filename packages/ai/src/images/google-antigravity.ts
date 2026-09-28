@@ -3,7 +3,7 @@ import {
 	ANTIGRAVITY_SANDBOX_ENDPOINT,
 	fetchAntigravityImageModel,
 } from "@oh-my-pi/pi-catalog/discovery/antigravity";
-import type { Model } from "@oh-my-pi/pi-catalog/types";
+import type { FetchImpl, Model } from "@oh-my-pi/pi-catalog/types";
 import { getAntigravityUserAgent } from "@oh-my-pi/pi-catalog/wire/gemini-headers";
 import { readSseJson } from "@oh-my-pi/pi-utils";
 import { withAuth } from "../auth-retry";
@@ -48,6 +48,40 @@ export function parseAntigravityCredentials(raw: string): AntigravityCredentials
 function antigravityEndpoints(model: Model): string[] {
 	const configured = model.baseUrl.replace(/\/+$/, "");
 	return [...new Set([configured, ANTIGRAVITY_PRIMARY_ENDPOINT, ANTIGRAVITY_SANDBOX_ENDPOINT])];
+}
+
+/**
+ * Resolve the Cloud Code Assist project that actually backs image generation for
+ * the current OAuth token. The stored credential's projectId can point at a GCP
+ * project without the `cloudaicompanion` license while `loadCodeAssist` reports
+ * the consumer project that does (403 SUBSCRIPTION_REQUIRED vs 200).
+ */
+async function resolveAntigravityImageProject(
+	fetchImpl: FetchImpl,
+	bearer: string,
+	fallback: string,
+	signal?: AbortSignal,
+): Promise<string> {
+	try {
+		const response = await fetchImpl(`${ANTIGRAVITY_PRIMARY_ENDPOINT}/v1internal:loadCodeAssist`, {
+			method: "POST",
+			headers: {
+				Authorization: `Bearer ${bearer}`,
+				"Content-Type": "application/json",
+				"User-Agent": getAntigravityUserAgent(),
+			},
+			body: JSON.stringify({ metadata: { ideType: "ANTIGRAVITY" } }),
+			signal,
+		});
+		if (response.ok) {
+			const payload = (await response.json()) as { cloudaicompanionProject?: string };
+			const projectId = payload.cloudaicompanionProject;
+			if (projectId && projectId.length > 0) return projectId;
+		}
+	} catch {
+		// Discovery is best-effort; the stored credential project remains the fallback.
+	}
+	return fallback;
 }
 
 async function resolveTarget(
@@ -148,7 +182,13 @@ export async function generateAntigravityImage(
 				throw new AIError.ValidationError("Antigravity image credentials must contain token and projectId");
 			}
 			const target = await resolveTarget(model, credentials, fetchImpl, options.signal);
-			const body = buildRequest(request, target.model, credentials.projectId);
+			const projectId = await resolveAntigravityImageProject(
+				fetchImpl,
+				credentials.accessToken,
+				credentials.projectId,
+				options.signal,
+			);
+			const body = buildRequest(request, target.model, projectId);
 			let lastError: ImageApiError | undefined;
 			for (let index = 0; index < target.endpoints.length; index++) {
 				const result = await fetchImpl(`${target.endpoints[index]}/v1internal:streamGenerateContent?alt=sse`, {
