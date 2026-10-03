@@ -305,3 +305,99 @@ describe("tools.approvalMode setting", () => {
 		).rejects.toThrow(/pending provider safety checks but no interactive UI/);
 	});
 });
+
+describe("tool_call handler `approve` result", () => {
+	// Headless (hasUI=false) + always-ask: every exec-tier call needs approval, and with no UI the
+	// only way through is a handler pre-approval. The handler's answer is steered per test.
+	let tempDir: string;
+	let session: AgentSession;
+	let answer: { block?: boolean; reason?: string; approve?: boolean } | undefined;
+
+	beforeAll(async () => {
+		tempDir = fs.mkdtempSync(path.join(os.tmpdir(), `pi-approve-result-${Snowflake.next()}-`));
+		const cwd = path.join(tempDir, "cwd");
+		fs.mkdirSync(cwd, { recursive: true });
+		const created = await createAgentSession({
+			cwd,
+			agentDir: tempDir,
+			sessionManager: SessionManager.create(cwd, path.join(tempDir, "sessions")),
+			settings: Settings.isolated({ ...BASE_SETTINGS, "tools.approvalMode": "always-ask" }),
+			model: getBundledModel("openai", "gpt-4o-mini"),
+			disableExtensionDiscovery: true,
+			extensions: [
+				pi => {
+					pi.on("tool_call", () => answer);
+				},
+			],
+			skills: [],
+			contextFiles: [],
+			workspaceTree: emptyWorkspaceTree(cwd),
+			promptTemplates: [],
+			slashCommands: [],
+			enableMCP: false,
+			enableLsp: false,
+			toolNames: ["bash"],
+		});
+		session = created.session;
+	});
+
+	afterAll(async () => {
+		await session.dispose();
+		removeSyncWithRetries(tempDir);
+	});
+
+	function run(id: string, command: string, extra: Record<string, unknown> = {}) {
+		const bash = session.getToolByName("bash");
+		if (!bash) throw new Error("Expected bash tool");
+		const settings = Settings.isolated({ ...BASE_SETTINGS, "tools.approvalMode": "always-ask" });
+		return bash.execute(id, { command }, undefined, undefined, { settings, ...extra } as AgentToolContext);
+	}
+
+	it("runs a prompt-gated tool without UI when a handler approves", async () => {
+		answer = { approve: true };
+		expect(textOf(await run("approve-1", "echo approved"))).toContain("approved");
+	});
+
+	it("still refuses when no handler approves", async () => {
+		answer = undefined;
+		await expect(run("approve-none", "echo refused")).rejects.toThrow(/requires approval but no interactive UI/);
+	});
+
+	it("does not carry an approval over to the next call", async () => {
+		answer = { approve: true };
+		await run("approve-once", "echo first");
+		answer = undefined;
+		await expect(run("approve-after", "echo second")).rejects.toThrow(/requires approval but no interactive UI/);
+	});
+
+	it("lets block win over approve", async () => {
+		answer = { approve: true, block: true, reason: "operator gate" };
+		await expect(run("approve-block", "echo nope")).rejects.toThrow(/operator gate/);
+	});
+
+	it("does not override a deny policy", async () => {
+		answer = { approve: true };
+		await expect(run("approve-deny", "rm -rf /tmp/pi-approve-deny-never-created")).rejects.toThrow();
+		expect(fs.existsSync("/tmp/pi-approve-deny-never-created")).toBe(false);
+	});
+
+	it("does not override provider safety checks", async () => {
+		answer = { approve: true };
+		await expect(
+			run("approve-safety", "echo blocked", {
+				toolCall: {
+					batchId: "safety-batch",
+					index: 0,
+					total: 1,
+					toolCalls: [],
+					providerMetadata: {
+						type: "computer",
+						providerItemId: "computer-call",
+						actions: [],
+						pendingSafetyChecks: [{ id: "safety-check" }],
+					},
+				},
+			}),
+		).rejects.toThrow(/pending provider safety checks but no interactive UI/);
+	});
+});

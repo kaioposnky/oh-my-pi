@@ -302,6 +302,10 @@ export class ExtensionToolWrapper<TParameters extends TSchema = TSchema, TDetail
 				throw new Error(`Extension failed, blocking execution: ${String(err)}`);
 			}
 		}
+		// Consumed here (after the emit that may have recorded it, before any later throw) so a
+		// pre-approval can never outlive this call. Satisfies the `prompt` gate only; `deny` and
+		// provider safety checks are enforced independently below.
+		const preApproved = this.runner.consumeToolCallApproved(toolCallId, this.tool.name);
 		if (!loopDispatchedToolCall) {
 			const preflight = await this.runner.runToolCallPreflightBefore?.(
 				toolCallId,
@@ -340,7 +344,7 @@ export class ExtensionToolWrapper<TParameters extends TSchema = TSchema, TDetail
 		const approvalCheck = {
 			required:
 				pendingSafetyChecks.length > 0 ||
-				(resolved.policy === "prompt" && !acpBypass && (explicitPrompt || !xdevBypass)),
+				(resolved.policy === "prompt" && !preApproved && !acpBypass && (explicitPrompt || !xdevBypass)),
 			reason: resolved.reason,
 		};
 
