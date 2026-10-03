@@ -47,6 +47,7 @@ export interface Args {
 	maxTime?: number;
 	warnCost?: number;
 	maxCost?: number;
+	maxTurns?: number;
 	apiKey?: string;
 	systemPrompt?: string;
 	systemPromptTemplate?: string;

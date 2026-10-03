@@ -1999,6 +1999,11 @@ Older entries are archived in [packages/coding-agent/CHANGELOG.md@241e6b4d725c](
 ### Fixed
 
 - Fixed an `EPIPE: broken pipe` unhandled rejection crashing the session when a debug adapter, eval kernel, IDA worker, or RPC server exits mid-write (seen on Windows) ([#14196](https://github.com/can1357/oh-my-pi/pull/14196) by [@andrebrait](https://github.com/andrebrait))
+### Added
+
+- `tool_call` extension handlers can return `approve: true` to pre-approve a call, skipping the approval prompt (also without a UI) while `deny` policy, `block`, and provider safety checks still apply.
+- `--max-turns <n>` stops the session after N agent turns.
+
 ### Fixed
 
 - Pi extensions now see CLI values for their registered flags (`--my-flag`) when `getFlag()` is read inside the extension factory, instead of only the default.

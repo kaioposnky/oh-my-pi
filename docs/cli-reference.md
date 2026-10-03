@@ -152,6 +152,7 @@ See [providers](./providers.md) and [models](./models.md) for model resolution.
 | `--max-fps <n>`            | Repaint ceiling in frames per second (default `30`; `1`–`120`), streaming text included; keystroke echo keeps 30 fps. Overrides `tui.maxFps` and `PI_MAX_FPS` for this run.                                                                          |
 | `--warn-cost <usd>`        | Warn once when the session's spend, subagents included, reaches this many USD. Overrides `session.warnCost`.                                                                                         |
 | `--max-cost <usd>`         | Stop sending model requests once the session's spend reaches this many USD; a request already in flight can carry spend past it. Overrides `session.maxCost`.                                        |
+| `--max-turns <n>` | Stop the session after this many agent turns (positive integer). |
 
 #### Extensions, hooks, skills, and rules
 
@@ -233,6 +234,7 @@ unattended runs with `--max-time`.
 # Start a long build in the background, then react to its result in the same session
 omp -p --wait-async --max-time 2h "Run the integration suite in the background and fix what fails"
 ```
+- `--max-turns <n>` — bound the run by agent turns.
 
 `--mode json` emits a session header followed by events as JSON lines.
 Incremental `message_update` events omit full partial-message snapshots; completed
