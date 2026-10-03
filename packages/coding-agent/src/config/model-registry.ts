@@ -6,9 +6,10 @@ import { registerOAuthProvider, unregisterOAuthProvider, unregisterOAuthProvider
 import type { OAuthCredentials, OAuthLoginCallbacks } from "@oh-my-pi/pi-ai/oauth/types";
 import { setCodexAttestationProvider } from "@oh-my-pi/pi-ai/providers/openai-codex-attestation";
 import { getProviderDefinition } from "@oh-my-pi/pi-ai/registry";
-import { getEnvApiKey, isOfficialCodexApiUrl } from "@oh-my-pi/pi-ai/stream";
+import { completeSimple, getEnvApiKey, isOfficialCodexApiUrl } from "@oh-my-pi/pi-ai/stream";
 import type {
 	Api,
+	AssistantMessage,
 	Context,
 	Model,
 	ModelSpec,
@@ -2961,6 +2962,27 @@ export class ModelRegistry {
 		} catch (error) {
 			return { ok: false, error: error instanceof Error ? error.message : String(error) };
 		}
+	}
+
+	/**
+	 * One-shot completion through the historical Pi extension facade
+	 * (`ctx.modelRegistry.complete(model, context, options)`): resolves the
+	 * model's credential and configured headers, then runs the request. Pi
+	 * extensions pass `systemPrompt` as one string; omp contexts carry a list.
+	 */
+	async complete(
+		model: Model<Api>,
+		context: Omit<Context, "systemPrompt"> & { systemPrompt?: string | string[] },
+		options?: SimpleStreamOptions,
+	): Promise<AssistantMessage> {
+		const auth = await this.getApiKeyAndHeaders(model);
+		if (!auth.ok) throw new Error(auth.error);
+		const { systemPrompt } = context;
+		return completeSimple(
+			model,
+			{ ...context, systemPrompt: typeof systemPrompt === "string" ? [systemPrompt] : systemPrompt },
+			{ ...options, apiKey: auth.apiKey, headers: { ...auth.headers, ...options?.headers } },
+		);
 	}
 
 	/**

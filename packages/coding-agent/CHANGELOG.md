@@ -139,6 +139,11 @@
 ### Fixed
 
 - Fixed an `EPIPE: broken pipe` unhandled rejection crashing the session when a debug adapter, eval kernel, IDA worker, or RPC server exits mid-write (seen on Windows) ([#14196](https://github.com/can1357/oh-my-pi/pull/14196) by [@andrebrait](https://github.com/andrebrait))
+### Fixed
+
+- Pi extensions now see CLI values for their registered flags (`--my-flag`) when `getFlag()` is read inside the extension factory, instead of only the default.
+- Added the Pi `ctx.modelRegistry.complete(model, context, options)` facade (accepts a string `systemPrompt`), so Pi extensions that run one-shot completions work on omp.
+- Skill and prompt entries from `getCommands()` now carry Pi's `sourceInfo.path` alongside `path`.
 
 ## [18.5.1] - 2026-10-03
 
