@@ -89,7 +89,9 @@ test("hard input requirements exclude incompatible models", () => {
   const multimodal = model("multimodal", { input: ["text", "image"] });
   assert.equal(capabilityFit(textOnly, "vision", { needsImages: true }), -100);
   assert.ok(capabilityFit(multimodal, "vision", { needsImages: true }) > 0);
-  assert.equal(capabilityFit(textOnly, "url", { needsUrls: true }), -100);
+  // No host model declares `url` input (omp fetches URLs with tools), so URLs never exclude a model.
+  assert.ok(capabilityFit(textOnly, "url", { needsUrls: true }) >= 0);
+  assert.equal(classifyModelNeed("improve the hero section design of my landing page").profile, "reasoning");
 });
 
 // --- cache economics --------------------------------------------------------
