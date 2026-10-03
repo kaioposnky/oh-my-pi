@@ -1,6 +1,6 @@
 import type { ExtensionAPI, ExtensionCommandContext, ExtensionContext } from "@earendil-works/pi-coding-agent";
 import type { JevClient } from "./jev.js";
-import type { NoulQuestionConfig, QuestionConfig } from "./types.js";
+import { queryTerms, type NoulQuestionConfig, type QuestionConfig } from "./types.js";
 
 /** Single activation cutoff for Jev probabilities. Raise to reduce noise, lower for recall. */
 export const JEV_THRESHOLD = 0.65;
@@ -89,7 +89,7 @@ export class SkillRouter {
     query: string,
     limit = 10
   ): SkillMetadata[] {
-    const terms = query.toLowerCase().split(/[^a-z0-9]+/).filter(Boolean);
+    const terms = queryTerms(query);
     if (terms.length === 0) {
       return skills.slice(0, limit);
     }
