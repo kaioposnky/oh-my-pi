@@ -162,4 +162,22 @@ describe("disabledExtensions runtime filtering", () => {
 		// it as an independently toggleable row.
 		expect(gemini && isShadowedExtension(gemini)).toBe(true);
 	});
+
+	test("a foreign ~/ copy that is not opted in does not shadow the copy that loads", async () => {
+		// Same skill in ~/.claude (higher priority, foreign, not opted in) and ~/.agents (loads).
+		for (const dir of [".claude", ".agents"]) {
+			const skillDir = path.join(tempHomeDir, dir, "skills", "shared-skill");
+			await fs.mkdir(skillDir, { recursive: true });
+			await fs.writeFile(
+				path.join(skillDir, "SKILL.md"),
+				"---\nname: shared-skill\ndescription: shared\n---\nbody\n",
+			);
+		}
+		initializeWithSettings(Settings.isolated({}));
+
+		const rows = (await loadAllExtensions(tempDir, [])).filter(extension => extension.name === "shared-skill");
+		const byProvider = Object.fromEntries(rows.map(row => [row.source.provider, row.state]));
+
+		expect(byProvider).toEqual({ claude: "disabled", agents: "active" });
+	});
 });
