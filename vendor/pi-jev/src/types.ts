@@ -7,6 +7,25 @@ export function isJevTool(name: string): boolean {
   return (JEV_TOOL_NAMES as readonly string[]).includes(name);
 }
 
+const STOPWORDS: Record<string, true> = {
+  the: true, and: true, for: true, with: true, this: true, that: true, from: true, into: true, what: true,
+  how: true, can: true, you: true, please: true, then: true, are: true, was: true, its: true, our: true,
+  your: true, use: true, make: true, about: true,
+};
+const URL_TOKEN = /\b(?:https?:\/\/|www\.)\S+|\b(?:[a-z0-9-]+\.)+[a-z]{2,}(?:\/\S*)?/gi;
+
+/**
+ * Keyword terms for local shortlisting. Raw URLs become web terms instead of
+ * "https"/"com" fragments, and short/stop words are dropped: they match nearly
+ * every description and push real candidates out of the shortlist.
+ */
+export function queryTerms(query: string): string[] {
+  const stripped = query.replace(URL_TOKEN, " ");
+  const terms = stripped.toLowerCase().split(/[^a-z0-9]+/).filter((w) => w.length >= 3 && !STOPWORDS[w]);
+  if (stripped !== query) terms.push("browse", "web", "website");
+  return [...new Set(terms)];
+}
+
 export interface BaseQuestionConfig {
   instructions: string;
 }
