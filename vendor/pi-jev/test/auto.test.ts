@@ -5,6 +5,7 @@ import { JEV_THRESHOLD } from "../src/skills.js";
 import type { JevClient } from "../src/jev.js";
 import type { ToolRouter } from "../src/router.js";
 import type { SkillRouter } from "../src/skills.js";
+import { WEB_TASK } from "../src/types.js";
 
 function stubs(configured = true) {
   const calls: { evaluate: number; activate: number } = { evaluate: 0, activate: 0 };
@@ -46,6 +47,19 @@ test("AutoJev stays off until enabled", async () => {
   assert.equal(result.ran, false);
   assert.equal(result.reason, "disabled");
   assert.equal(calls.evaluate, 0);
+});
+
+test("web tasks route with auto mode off; ordinary prompts and file names do not", async () => {
+  const { jevClient, router, skillRouter, calls } = stubs();
+  const auto = new AutoJev(jevClient, router, skillRouter, false);
+  for (const prompt of ["open https://example.com", "take a screenshot of the site", "browse to the docs"]) {
+    assert.ok(WEB_TASK.test(prompt), prompt);
+  }
+  for (const prompt of ["fix the bug in index.ts", "inspect docker logs"]) {
+    assert.ok(!WEB_TASK.test(prompt), prompt);
+  }
+  assert.equal((await auto.route("inspect docker logs", undefined, undefined, true)).ran, true);
+  assert.equal(calls.evaluate, 1);
 });
 
 test("AutoJev skips when Jev is unconfigured", async () => {

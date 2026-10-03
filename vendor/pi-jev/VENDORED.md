@@ -6,3 +6,6 @@ Local changes:
   (previously "https"/"com"/"the" matched everything and pushed browser skills out of the Jev candidates).
 - `src/model-router.ts`: URL input no longer excludes models (no omp model declares `url` input; URLs are
   fetched with tools), and bare "page"/"website" no longer classifies design prompts as URL tasks.
+- Web tasks (`WEB_TASK` in `src/types.ts`) get one Jev routing pass even with auto mode off; opt out with
+  `PI_JEV_WEB=0`. Benchmarked (3 tasks x 3 trials per arm): screenshot task 55s -> 19s, by going straight to
+  the agent-browser skill instead of a broken relay; simple fetch tasks ~1s Jev overhead, no gain.
