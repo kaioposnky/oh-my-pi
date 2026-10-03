@@ -21,7 +21,7 @@ import {
 	enableUserSource,
 	isProviderEnabled,
 	isUserSourceEnabled,
-	loadCapability,
+	loadCapability as discoverCapability,
 } from "../../../discovery";
 import { readDisabledServers, readEnabledServers } from "../../../mcp/config-writer";
 import { commandPreview } from "@oh-my-pi/pi-tui/overlays/extensions/inspector-model";
@@ -106,9 +106,21 @@ export async function loadAllExtensions(cwd?: string, disabledIds?: string[]): P
 		}
 	}
 
+	// Dedupe only among sources the loaders actually read. A gated-off source
+	// (provider switched off, foreign `~/` not opted in) must not claim a name and
+	// mark the copy that really loads as "shadowed"; it is listed on its own below.
+	const isGated = (item: { _source: SourceMeta }): boolean =>
+		resolveState(item._source, false, false).state !== "active";
 	const loadOpts = cwd
 		? { cwd, includeDisabled: true, disabledExtensions: effectiveDisabledIds }
 		: { includeDisabled: true, disabledExtensions: effectiveDisabledIds };
+	const loadCapability = async <T>(id: string, opts: typeof loadOpts) => {
+		const [live, gated] = await Promise.all([
+			discoverCapability<T>(id, { ...opts, filter: item => !isGated(item) }),
+			discoverCapability<T>(id, { ...opts, filter: isGated }),
+		]);
+		return { all: [...live.all, ...gated.all.map(item => Object.assign(item, { _shadowed: false }))] };
+	};
 
 	// Load skills
 	try {
