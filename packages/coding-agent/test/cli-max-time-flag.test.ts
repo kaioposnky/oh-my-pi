@@ -112,3 +112,18 @@ describe("parseArgs — --max-time flag", () => {
 		expect(observedOptions?.deadline).toBeLessThanOrEqual(afterRun + 3_000);
 	});
 });
+
+describe("parseArgs — --max-turns flag", () => {
+	it("parses a positive integer as maxTurns", () => {
+		const result = parseArgs(["--max-turns", "7", "--print", "hello"]);
+
+		expect(result.maxTurns).toBe(7);
+		expect(result.messages).toEqual(["hello"]);
+	});
+
+	it("rejects zero, negative, fractional and non-numeric values", () => {
+		for (const value of ["0", "-1", "1.5", "abc", ""]) {
+			expect(() => parseArgs(["--max-turns", value, "--print", "hello"])).toThrow("--max-turns");
+		}
+	});
+});
