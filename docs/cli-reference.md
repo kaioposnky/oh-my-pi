@@ -147,6 +147,7 @@ See [providers](./providers.md) and [models](./models.md) for model resolution.
 | `--advisor`                | Enable the advisor runtime (passively reviews each turn and injects notes). See [advisor / watchdog](./advisor-watchdog.md).                                                                         |
 | `--wait-async`             | Print mode: before exiting, wait for this run's background jobs and start another turn in the same session with each result (`async.printWake`). See [Headless / print mode](#headless--print-mode). |
 | `--max-time <duration>`    | Stop the session after this duration (e.g. `600`, `10m`, `1h`).                                                                                                                                      |
+| `--max-turns <n>` | Stop the session after this many agent turns (positive integer). |
 | `--motion <mode>`          | Animation preset: `full` (default), `reduced` (250 ms spinners, no shimmer or blink/fade) or `none` (static spinners and title). Streaming text is unaffected; see `--max-fps`. Overrides `tui.motion` and `PI_MOTION` for this run.                  |
 | `--spinner-interval <ms>`  | Milliseconds between spinner frames, terminal title included (default `80`; `0` = static). Overrides `tui.spinnerInterval` and `PI_SPINNER_INTERVAL` for this run.                                                                                  |
 | `--max-fps <n>`            | Repaint ceiling in frames per second (default `30`; `1`–`120`), streaming text included; keystroke echo keeps 30 fps. Overrides `tui.maxFps` and `PI_MAX_FPS` for this run.                                                                          |
@@ -218,6 +219,7 @@ Related flags for headless runs:
 - `--no-title` — skip title auto-generation (also `PI_NO_TITLE`).
 - `--max-time <duration>` — bound the run.
 - `--wait-async` — keep the run alive for its background jobs (below).
+- `--max-turns <n>` — bound the run by agent turns.
 - `--warn-cost <usd>` / `--max-cost <usd>` — warn at, or stop sending model requests from, a spend.
 
 Print mode is single-shot by default: once its prompts are answered it disposes

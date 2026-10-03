@@ -186,6 +186,13 @@ export const STRING_SETTERS: Record<string, StringSetter> = {
 	"--max-cost": (result, value) => {
 		result.maxCost = parseCostUsd("--max-cost", value);
 	},
+	"--max-turns": (result, value) => {
+		const turns = Number(value.trim());
+		if (!Number.isInteger(turns) || turns <= 0) {
+			throw new CliUsageError(`Invalid --max-turns value: ${JSON.stringify(value)}. Expected a positive integer.`);
+		}
+		result.maxTurns = turns;
+	},
 	"--service-tier": (result, value) => {
 		if (!isServiceTierOpenAISettingValue(value)) {
 			throw new CliUsageError(
