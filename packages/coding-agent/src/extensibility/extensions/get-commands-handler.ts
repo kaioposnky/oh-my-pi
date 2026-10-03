@@ -53,6 +53,7 @@ export function getSessionSlashCommands(session: CommandsCapableSession): SlashC
 			source: "prompt",
 			location: customCommandLocation(cmd.source),
 			path: cmd.resolvedPath,
+			sourceInfo: cmd.resolvedPath ? { path: cmd.resolvedPath } : undefined,
 		});
 	}
 
@@ -63,6 +64,7 @@ export function getSessionSlashCommands(session: CommandsCapableSession): SlashC
 				description: skill.description || undefined,
 				source: "skill",
 				path: skill.filePath,
+				sourceInfo: { path: skill.filePath },
 			});
 		}
 	}

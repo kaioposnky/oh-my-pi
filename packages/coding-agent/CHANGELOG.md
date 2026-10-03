@@ -155,6 +155,22 @@
 - Added the `antigravity-cli` provider for Google Antigravity over ACP, with managed binary installation, `/login antigravity-cli` Google sign-in, host tool execution, and retained conversations across tool steps and history changes.
 
 ## [18.20.1] - 2026-11-14
+### Changed
+
+- Picking a model for a role in `/models` now puts the cursor on the model list, so ↑/↓ choose a model and Enter assigns it right away instead of moving through the sidebar and dropping the role selection; ← still reaches the providers ([#14210](https://github.com/can1357/oh-my-pi/pull/14210) by [@H4vC](https://github.com/H4vC))
+- Sped up secret redaction on long conversations: it no longer slows down as history grows ([#14213](https://github.com/can1357/oh-my-pi/pull/14213) by [@H4vC](https://github.com/H4vC))
+- Startup is faster with plugins that bundle large dependency trees: the extension loader no longer re-reads and re-checks the same files while loading them (e.g. ~280 ms → ~185 ms with the IDA MCP plugin) ([#14219](https://github.com/can1357/oh-my-pi/pull/14219) by [@H4vC](https://github.com/H4vC))
+
+### Fixed
+
+- Fixed an `EPIPE: broken pipe` unhandled rejection crashing the session when a debug adapter, eval kernel, IDA worker, or RPC server exits mid-write (seen on Windows) ([#14196](https://github.com/can1357/oh-my-pi/pull/14196) by [@andrebrait](https://github.com/andrebrait))
+### Fixed
+
+- Pi extensions now see CLI values for their registered flags (`--my-flag`) when `getFlag()` is read inside the extension factory, instead of only the default.
+- Added the Pi `ctx.modelRegistry.complete(model, context, options)` facade (accepts a string `systemPrompt`), so Pi extensions that run one-shot completions work on omp.
+- Skill and prompt entries from `getCommands()` now carry Pi's `sourceInfo.path` alongside `path`.
+
+## [18.5.1] - 2026-10-03
 
 ### Added
 
