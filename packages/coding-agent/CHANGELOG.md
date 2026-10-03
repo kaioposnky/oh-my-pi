@@ -7,6 +7,7 @@
 - Pi extensions now see CLI values for their registered flags (`--my-flag`) when `getFlag()` is read inside the extension factory, instead of only the default.
 - Added the Pi `ctx.modelRegistry.complete(model, context, options)` facade (accepts a string `systemPrompt`), so Pi extensions that run one-shot completions work on omp.
 - Skill and prompt entries from `getCommands()` now carry Pi's `sourceInfo.path` alongside `path`.
+- The extensions dashboard no longer marks a skill (or other item) "shadowed" by a copy from a source that is switched off or not opted in (e.g. `~/.claude`, `~/.codex`); the copy that actually loads now shows as active.
 
 ## [18.5.1] - 2026-10-03
 
