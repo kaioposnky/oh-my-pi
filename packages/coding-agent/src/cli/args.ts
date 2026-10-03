@@ -43,6 +43,7 @@ export interface Args {
 	planYolo?: boolean;
 	planYoloInto?: string;
 	maxTime?: number;
+	maxTurns?: number;
 	apiKey?: string;
 	systemPrompt?: string;
 	systemPromptTemplate?: string;
