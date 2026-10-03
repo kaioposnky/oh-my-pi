@@ -58,7 +58,9 @@ export class AutoJev {
   public async route(
     prompt: string,
     ctx?: ExtensionContext,
-    signal?: AbortSignal
+    signal?: AbortSignal,
+    /** Route this prompt even when auto mode is off (web tasks). */
+    force = false
   ): Promise<AutoRouteResult> {
     const startTime = Date.now();
     const skip = (reason: AutoSkipReason): AutoRouteResult => ({
@@ -69,7 +71,7 @@ export class AutoJev {
       elapsedMs: Date.now() - startTime,
     });
 
-    if (!this.enabled) return skip("disabled");
+    if (!this.enabled && !force) return skip("disabled");
     if (this.running) return skip("busy");
     if (!prompt || !prompt.trim() || prompt.trim().startsWith("/")) {
       return skip("empty-prompt");

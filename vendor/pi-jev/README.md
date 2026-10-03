@@ -9,7 +9,7 @@ Semantic tool routing and typed decisions for the [Pi coding agent](https://pi.d
 - **Typed Judgments (`jev_evaluate`)**: Run fast, calibrated System One decisions directly from the agent using Choice, Noul (yes/no probability), and Score primitives.
 - **Custom Jev Endpoint**: `PI_JEV_BASE_URL` / `TYPESAFE_BASE_URL` points the TypeSafe client at Jev-compatible local servers or proxies such as Laya `laya-serve`.
 - **Dynamic Evaluations (`/jev test <prompt>`)**: The active model designs the Jev question schema for a free-form prompt, then Jev evaluates it.
-- **Automatic Mode (opt-in)**: `--jev-auto` / `PI_JEV_AUTO=1` / `/jev auto on` routes tools and suggests skills before every prompt. Off by default.
+- **Automatic Mode (opt-in)**: `--jev-auto` / `PI_JEV_AUTO=1` / `/jev auto on` routes tools and suggests skills before every prompt. Off by default, except for web tasks (URLs, browse, screenshot, website): those are always routed, because it sends the agent straight to the browser skill. Opt out with `PI_JEV_WEB=0`.
 - **Automatic Model Mode (opt-in)**: `--jev-auto-model` / `PI_JEV_AUTO_MODEL=1` / `/jev auto-model on` selects fast, balanced, reasoning, long-context, or vision/URL models per prompt. Scores candidates by capability fit with real prefix-aware cache cost as a tie-breaker. Off by default.
 - **Reasoning-Level Mode (opt-in)**: `--jev-thinking` / `PI_JEV_THINKING=1` / `/jev thinking on` sets the reasoning level per prompt (escalates for planning, debugging, and review; de-escalates for short mechanical tasks) without changing the model, so the prompt cache identity stays fixed. Off by default.
 - **Tool Call Guard (opt-in)**: `--jev-tool-guard` / `PI_JEV_TOOL_GUARD=1` / `/jev tool-guard on` intercepts tool calls with Jev to detect hallucinations and enhance failed results. Off by default.
@@ -165,7 +165,7 @@ Candidates are chosen by **capability, with cost as a tie-breaker**, using the m
 - Among models within `FIT_TOLERANCE` of the best fit, the one with the lowest switch cost wins. Cost never overturns a larger fit gap, so price cannot downgrade a model that is genuinely more capable — however long the conversation.
 - When Jev is configured, one Noul judgment (“would switching to `<model>` help this task?”) gates the switch: the probability must clear `requiredConfidence(switchCost)`, so a cheap miss is worth roughly a coin-flip and an expensive one needs near-certainty. Jev supplies the probability, code owns the threshold. Without a Jev judgment, cost only breaks ties and no confidence is claimed.
 - That question is folded into the same request as tool and skill routing when `/jev auto` is enabled, keeping it one Jev request per prompt.
-- A model is not charged a miss for "switching" to itself, and hard input requirements (image/URL) are filtered out before any of this, so cost can never veto a capability the task requires.
+- A model is not charged a miss for "switching" to itself, and hard input requirements (images) are filtered out before any of this, so cost can never veto a capability the task requires. URLs are a soft preference: hosts fetch them with tools.
 
 ### Reasoning-Level Mode
 
