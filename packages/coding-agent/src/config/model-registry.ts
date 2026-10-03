@@ -8,8 +8,10 @@ import { setCodexAttestationProvider } from "@oh-my-pi/pi-ai/providers/openai-co
 import { getProviderDefinition } from "@oh-my-pi/pi-ai/registry";
 import { getEnvApiKey } from "@oh-my-pi/pi-ai/env-api-key";
 import { OAuthRefreshUnavailableError } from "@oh-my-pi/pi-ai/error";
+import { completeSimple } from "@oh-my-pi/pi-ai/stream";
 import type {
 	Api,
+	AssistantMessage,
 	Context,
 	Model,
 	ModelSpec,
@@ -3275,10 +3277,28 @@ export class ModelRegistry {
 	}
 
 	/**
-	 * Resolve a provider's credential or the no-auth sentinel, for availability
-	 * checks. A transient OAuth refresh failure resolves `undefined` (like
-	 * `authStorage.keys.get`); request paths use
-	 * {@link getApiKeyWithCredentialForProvider}, which surfaces it.
+	 * One-shot completion through the historical Pi extension facade
+	 * (`ctx.modelRegistry.complete(model, context, options)`): resolves the
+	 * model's credential and configured headers, then runs the request. Pi
+	 * extensions pass `systemPrompt` as one string; omp contexts carry a list.
+	 */
+	async complete(
+		model: Model<Api>,
+		context: Omit<Context, "systemPrompt"> & { systemPrompt?: string | string[] },
+		options?: SimpleStreamOptions,
+	): Promise<AssistantMessage> {
+		const auth = await this.getApiKeyAndHeaders(model);
+		if (!auth.ok) throw new Error(auth.error);
+		const { systemPrompt } = context;
+		return completeSimple(
+			model,
+			{ ...context, systemPrompt: typeof systemPrompt === "string" ? [systemPrompt] : systemPrompt },
+			{ ...options, apiKey: auth.apiKey, headers: { ...auth.headers, ...options?.headers } },
+		);
+	}
+
+	/**
+	 * Resolve a provider's request credential or the no-auth sentinel.
 	 *
 	 * `options.forceRefresh` re-mints the session-sticky OAuth token even when
 	 * the cached copy still looks valid. `options.signal` is threaded into any

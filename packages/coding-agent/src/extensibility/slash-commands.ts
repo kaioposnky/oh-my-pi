@@ -18,6 +18,8 @@ export interface SlashCommandInfo {
 	source: SlashCommandSource;
 	location?: SlashCommandLocation;
 	path?: string;
+	/** Historical Pi shape of {@link path}, for extensions written against upstream Pi. */
+	sourceInfo?: { path: string };
 }
 
 export type { BuiltinSlashCommand, SubcommandDef } from "../slash-commands/types";
