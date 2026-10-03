@@ -30,6 +30,21 @@ test("ToolRouter shortlists inactive tools correctly using local keywords", () =
   assert.equal(candidates[0].name, "docker_logs");
 });
 
+test("a raw URL shortlists the browser tool, not tools matching 'https'/'com' fragments", () => {
+  // Test double: ToolRouter only calls these three ExtensionAPI members.
+  const mockPi = {
+    getAllTools: () => [
+      { name: "commit", description: "Create a git commit; com" },
+      { name: "the_helper", description: "Does the thing for the and with" },
+      { name: "browser", description: "Browse a website in a headless web browser" },
+    ],
+    getActiveTools: () => [],
+    setActiveTools: () => {},
+  } as unknown as ConstructorParameters<typeof ToolRouter>[0];
+  const candidates = new ToolRouter(mockPi, new JevClient()).shortlist("open https://example.com and summarize the page", 1);
+  assert.equal(candidates[0].name, "browser");
+});
+
 test("ToolRouter findAndActivate fallback when unconfigured does not activate unjudged tools", async () => {
   const mockTools = [
     { name: "read", description: "Read files" },
