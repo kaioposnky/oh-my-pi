@@ -1,6 +1,6 @@
 import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
 import type { JevClient } from "./jev.js";
-import { JEV_TOOL_NAMES, isJevTool } from "./types.js";
+import { JEV_TOOL_NAMES, isJevTool, queryTerms } from "./types.js";
 import { JEV_THRESHOLD } from "./skills.js";
 
 export interface ToolMetadata {
@@ -44,7 +44,7 @@ export class ToolRouter {
     const all = this.getAvailableTools();
 
     const inactive = all.filter((t) => !active.has(t.name) && !isJevTool(t.name));
-    const terms = query.toLowerCase().split(/[^a-z0-9]+/).filter(Boolean);
+    const terms = queryTerms(query);
 
     if (terms.length === 0) {
       return inactive.slice(0, limit);
