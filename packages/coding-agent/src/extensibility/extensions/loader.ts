@@ -18,6 +18,7 @@ import type {
 } from "@oh-my-pi/pi-ai";
 import { isBuiltinComposerStyle, type KeyId } from "@oh-my-pi/pi-tui";
 import { hasFsCode, isEacces, isEnoent, logger } from "@oh-my-pi/pi-utils";
+import { parseArgs } from "../../cli/args";
 import { type ExtensionModule, extensionModuleCapability } from "../../capability/extension-module";
 import { type Hook, hookCapability } from "../../capability/hook";
 import { isServiceTierFamily, isServiceTierForFamily } from "../../config/service-tier";
@@ -91,6 +92,13 @@ export class ExtensionRuntimeNotInitializedError extends Error {
 	constructor() {
 		super("Extension runtime not initialized. Action methods cannot be called during extension loading.");
 	}
+}
+
+/** Process CLI argv used to resolve extension flags at registration time; set once by the CLI entry. */
+let extensionCliArgs: string[] = [];
+
+export function setExtensionCliArgs(args: readonly string[]): void {
+	extensionCliArgs = [...args];
 }
 
 /**
@@ -261,8 +269,15 @@ class ConcreteExtensionAPI implements ExtensionAPI, IExtensionRuntime {
 		options: { description?: string; type: "boolean" | "string"; default?: boolean | string },
 	): void {
 		this.extension.flags.set(name, { name, extensionPath: this.extension.path, ...options });
-		if (options.default !== undefined) {
-			this.runtime.flagValues.set(name, options.default);
+		// Resolve the CLI value now: factories commonly read `getFlag()` right after
+		// registering, before the post-load reparse in `applyExtensionFlags` runs.
+		const cliValue =
+			extensionCliArgs.length > 0
+				? parseArgs(extensionCliArgs, new Map([[name, { type: options.type }]])).unknownFlags.get(name)
+				: undefined;
+		const value = cliValue ?? options.default;
+		if (value !== undefined) {
+			this.runtime.flagValues.set(name, value);
 		}
 	}
 
