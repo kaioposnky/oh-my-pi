@@ -2511,6 +2511,16 @@ export async function runRootCommand(
 				process.exit(1);
 			}
 
+			if (parsedArgs.maxTurns !== undefined) {
+				// Counts completed agent turns across the whole run (each model response + its tool
+				// results); aborts at the boundary so the in-flight turn's tools still settle.
+				const maxTurns = parsedArgs.maxTurns;
+				let turns = 0;
+				session.subscribe(event => {
+					if (event.type === "turn_end" && ++turns >= maxTurns) void session.abort();
+				});
+			}
+
 			if (mode === "rpc" || mode === "rpc-ui" || isInteractive) {
 				// Long-lived hosts apply on-disk config edits (config.yml, project
 				// settings, `--config` overlays) live. No-op unless this is the

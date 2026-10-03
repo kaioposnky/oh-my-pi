@@ -601,6 +601,22 @@ export class ExtensionRunner {
 		return this.#emittedToolCalls.delete(`${toolCallId}:${toolName}`);
 	}
 
+	#approvedToolCalls = new Set<string>();
+
+	/** Records a `tool_call` handler's `approve: true`; consumed by the wrapper's approval gate. Bounded like the other markers. */
+	markToolCallApproved(toolCallId: string, toolName: string): void {
+		if (this.#approvedToolCalls.size >= 512) {
+			const oldest = this.#approvedToolCalls.values().next().value;
+			if (oldest !== undefined) this.#approvedToolCalls.delete(oldest);
+		}
+		this.#approvedToolCalls.add(`${toolCallId}:${toolName}`);
+	}
+
+	/** Consumes a {@link markToolCallApproved} marker; true when a handler pre-approved this call. */
+	consumeToolCallApproved(toolCallId: string, toolName: string): boolean {
+		return this.#approvedToolCalls.delete(`${toolCallId}:${toolName}`);
+	}
+
 	/** Marks every dispatch prepared by the agent loop, independent of extension handlers. */
 	markLoopToolCall(toolCallId: string, toolName: string): void {
 		if (this.#loopToolCalls.size >= 512) {
@@ -1821,6 +1837,7 @@ export class ExtensionRunner {
 				extensionHandlerTimeoutMs,
 		);
 		let result: ToolCallEventResult | undefined;
+		let approved = false;
 		const aggregated = { input: undefined as ToolCallEventResult["input"], additionalContext: [] as string[] };
 
 		for (const ext of this.extensions) {
@@ -1848,11 +1865,16 @@ export class ExtensionRunner {
 				if (handlerResult.block) {
 					return handlerResult;
 				}
-				const { additionalContext: _context, input: _input, ...controlResult } = handlerResult;
+				const { additionalContext: _context, input: _input, approve, ...controlResult } = handlerResult;
+				if (approve === true) approved = true;
 				accumulateToolCallResult(aggregated, handlerResult);
 				result = controlResult;
 			}
 		}
+
+		// Marked only once every handler allowed the call: a later `block` returns above and a
+		// cancelled run never reaches execution, so neither can leave a stale pre-approval behind.
+		if (approved && !signal?.aborted) this.markToolCallApproved(event.toolCallId, event.toolName);
 
 		if (signal?.aborted) {
 			return { block: true, reason: `Tool execution was cancelled while an extension handler was pending` };
