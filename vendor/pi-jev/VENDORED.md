@@ -9,3 +9,5 @@ Local changes:
 - Web tasks (`WEB_TASK` in `src/types.ts`) get one Jev routing pass even with auto mode off; opt out with
   `PI_JEV_WEB=0`. Benchmarked (3 tasks x 3 trials per arm): screenshot task 55s -> 19s, by going straight to
   the agent-browser skill instead of a broken relay; simple fetch tasks ~1s Jev overhead, no gain.
+- `src/jev.ts`: client timeout 5s, no retries (SDK default 10s x 3 attempts stalled a prompt ~31s when the
+  endpoint hung; every Jev caller already fails open).

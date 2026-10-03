@@ -90,7 +90,15 @@ export class JevClient {
       throw new Error("Missing TYPESAFE_API_KEY. Set it in environment, ~/.pi/agent/secrets/typesafe_api_key, or set PI_JEV_BASE_URL for a compatible local endpoint.");
     }
     if (!this.client) {
-      this.client = new TypeSafeClient({ apiKey: key ?? "", ...(baseURL ? { baseURL } : {}) });
+      // Jev answers in ~0.3s and sits on the prompt/tool-call hot path, where every caller fails open.
+      // SDK default (10s x 3 attempts) stalled each prompt ~31s on a hung endpoint; fail fast instead.
+      // ponytail: fixed 5s/no retry; add PI_JEV_TIMEOUT_MS if a slow self-hosted endpoint needs more.
+      this.client = new TypeSafeClient({
+        apiKey: key ?? "",
+        ...(baseURL ? { baseURL } : {}),
+        timeout: 5_000,
+        retry: { maxRetries: 0 },
+      });
     }
     return this.client;
   }
