@@ -352,6 +352,15 @@ export interface ToolCallEventResult {
 	 * registration order; ignored when this or a later handler blocks the call.
 	 */
 	additionalContext?: string;
+	/**
+	 * Pre-approve this call: when the tool's resolved policy is `prompt`, the interactive approval
+	 * prompt is skipped (also in headless runs, where an unapproved prompt would otherwise fail
+	 * with "requires approval but no interactive UI"). Does NOT override a `deny` policy, a
+	 * `block` from any handler, or provider safety checks, which still fail closed. Sticky across
+	 * handlers: any non-blocking handler returning `true` approves. Applies to the input that
+	 * ends up executing, including a revision from `input`.
+	 */
+	approve?: boolean;
 }
 
 /**
