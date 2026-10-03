@@ -67,7 +67,7 @@ import {
 } from "./discovery/helpers";
 import { injectOmpExtensionCliRoots } from "./discovery/omp-extension-roots";
 import { formatExtensionLoadNotifications } from "./extensibility/extensions/load-errors";
-import { loadExtensions } from "./extensibility/extensions/loader";
+import { loadExtensions, setExtensionCliArgs } from "./extensibility/extensions/loader";
 import { ExtensionRunner } from "./extensibility/extensions/runner";
 import type { ExtensionUIContext } from "./extensibility/extensions/types";
 import { scheduleMarketplaceAutoUpdate } from "./extensibility/plugins/marketplace-auto-update";
@@ -1700,6 +1700,7 @@ export async function runRootCommand(
 	deps: RunRootCommandDependencies = DEFAULT_RUN_ROOT_DEPENDENCIES,
 ): Promise<void> {
 	logger.startTiming();
+	setExtensionCliArgs(rawArgs);
 	startStartupWatchdog();
 	try {
 		// Non-prepaint commands still need a default theme; an existing Composer
