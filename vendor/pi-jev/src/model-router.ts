@@ -21,7 +21,8 @@ const PROFILE_HINTS: Record<ModelProfile, RegExp> = {
   reasoning: /\b(plan|planning|architect|architecture|debug|diagnos|compare|trade-?off|design|review|security|why|analy[sz]|complex|refactor)\b/i,
   "long-context": /\b(full repo|entire repo|large diff|long document|all files|context|migration|codebase|many files)\b/i,
   vision: /\b(image|screenshot|photo|diagram|visual|picture|ui mockup|wireframe)\b/i,
-  url: /\b(url|link|webpage|website|page|article)\b/i,
+  // Bare "page"/"website" would claim design prompts ("landing page hero"); real URLs are caught by promptHasUrl.
+  url: /\b(url|link|webpage|article|browse|fetch)\b/i,
   balanced: /.*/,
 };
 
@@ -59,8 +60,8 @@ export function capabilityFit(model: Model<any>, profile: ModelProfile, opts: { 
   const reasoning = model.reasoning ? 3 : 0;
   const context = Math.min(model.contextWindow / 100_000, 5);
 
+  // URL input is a soft preference: hosts like omp fetch URLs with tools, so no model declares `url` input.
   if (opts.needsImages && !hasImage) return -100;
-  if (opts.needsUrls && !hasUrl) return -100;
 
   const image = profile === "vision" && hasImage ? 4 : 0;
   const url = profile === "url" && hasUrl ? 4 : 0;
