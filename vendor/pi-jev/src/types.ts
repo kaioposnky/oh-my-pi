@@ -12,7 +12,10 @@ const STOPWORDS: Record<string, true> = {
   how: true, can: true, you: true, please: true, then: true, are: true, was: true, its: true, our: true,
   your: true, use: true, make: true, about: true,
 };
-const URL_TOKEN = /\b(?:https?:\/\/|www\.)\S+|\b(?:[a-z0-9-]+\.)+[a-z]{2,}(?:\/\S*)?/gi;
+/** Explicit web addresses only; bare `name.ext` would match file names like `index.ts`. */
+const URL_TOKEN = /\b(?:https?:\/\/|www\.)\S+/gi;
+/** Prompts that need the web; Jev routing runs for these by default (benchmarked faster). */
+export const WEB_TASK = /\b(?:https?:\/\/|www\.)\S+|\b(?:browse|browsing|browser|screenshot|website|webpage|web page|scrape|navigate to)\b/i;
 
 /**
  * Keyword terms for local shortlisting. Raw URLs become web terms instead of
