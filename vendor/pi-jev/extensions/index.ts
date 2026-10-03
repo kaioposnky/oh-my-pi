@@ -11,6 +11,7 @@ import { AgentOrchestrator } from "../src/orchestrator.js";
 import { JevAgentHandler } from "../src/agent.js";
 import { ToolGuard } from "../src/tool-guard.js";
 import { AutoThinkingRouter } from "../src/thinking.js";
+import { WEB_TASK } from "../src/types.js";
 
 function envAutoEnabledFor(name: string): boolean {
   const raw = process.env[name]?.trim().toLowerCase();
@@ -126,9 +127,13 @@ export default function (pi: ExtensionAPI) {
     const routeOptions = { hasImages: Boolean(event.images?.length), hasUrls: promptHasUrl(event.prompt) || Boolean((event as any).urls?.length) };
     const modelPlan = autoModel.plan(event.prompt, ctx, routeOptions);
 
+    // Web tasks get Jev routing even with auto off: it sends the agent straight to the
+    // working browser skill (benchmarked 55s -> 19s on screenshot tasks). Opt out: PI_JEV_WEB=0.
+    const forceWeb = !auto.enabled && process.env.PI_JEV_WEB?.trim() !== "0" && WEB_TASK.test(event.prompt);
+
     // With auto-routing on, fold the model-switch question into the same Jev
     // request so the prompt costs one round-trip instead of two.
-    if (!auto.enabled) {
+    if (!auto.enabled && !forceWeb) {
       const modelResult = modelPlan.plan
         ? await autoModel.applyDecision(modelPlan.plan, await autoModel.judge(event.prompt, modelPlan.plan))
         : modelPlan.result;
@@ -142,7 +147,7 @@ export default function (pi: ExtensionAPI) {
     }
 
     if (modelPlan.plan) auto.pendingQuestions = [{ key: modelPlan.plan.questionKey, instructions: modelPlan.plan.instructions }];
-    const result = await auto.route(event.prompt, ctx, ctx.signal);
+    const result = await auto.route(event.prompt, ctx, ctx.signal, forceWeb);
 
     const modelResult = modelPlan.plan
       ? await autoModel.applyDecision(modelPlan.plan, result.modelConfidence)
