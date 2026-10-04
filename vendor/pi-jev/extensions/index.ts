@@ -1,4 +1,9 @@
-import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
+import type {
+  BeforeAgentStartEvent,
+  BeforeAgentStartEventResult,
+  ExtensionAPI,
+  ExtensionContext,
+} from "@earendil-works/pi-coding-agent";
 import { JevClient } from "../src/jev.js";
 import { ToolRouter } from "../src/router.js";
 import { SkillRouter } from "../src/skills.js";
@@ -12,6 +17,7 @@ import { JevAgentHandler } from "../src/agent.js";
 import { ToolGuard } from "../src/tool-guard.js";
 import { AutoThinkingRouter } from "../src/thinking.js";
 import { WEB_TASK } from "../src/types.js";
+import { Triage } from "../src/triage.js";
 
 function envAutoEnabledFor(name: string): boolean {
   const raw = process.env[name]?.trim().toLowerCase();
@@ -83,6 +89,9 @@ export default function (pi: ExtensionAPI) {
   const agentHandler = new JevAgentHandler(pi, jevClient);
   agentHandler.install();
 
+  const triage = new Triage(jevClient);
+  triage.install(pi);
+
   registerJevTools(pi, jevClient, router, skillRouter);
   registerJevCommands(pi, jevClient, router, skillRouter, auto, autoModel, compactor, agents, toolGuard, autoThinking);
 
@@ -120,6 +129,22 @@ export default function (pi: ExtensionAPI) {
   });
 
   pi.on("before_agent_start", async (event, ctx) => {
+    // Triage runs alongside routing (one extra ~0.3s Jev call, in parallel).
+    const [decision, routed] = await Promise.all([triage.triage(event.prompt, ctx.signal), route(event, ctx)]);
+    const triageText = decision && triage.message(decision);
+    if (decision && decision.action !== "implement") ctx.ui.setStatus("jev", `jev: triage ${decision.action}`);
+    if (!triageText) return routed;
+    const skillText = routed?.message?.content;
+    return {
+      message: {
+        customType: "jev-triage",
+        display: true,
+        content: typeof skillText === "string" ? `${triageText}\n\n${skillText}` : triageText,
+      },
+    };
+  });
+
+  async function route(event: BeforeAgentStartEvent, ctx: ExtensionContext): Promise<BeforeAgentStartEventResult | undefined> {
     if (agents.enabled && /\b(architecture|refactor|security review|entire repo|parallel|multiple agents|complex migration)\b/i.test(event.prompt)) {
       await agents.dispatch(event.prompt, ctx, true);
     }
@@ -178,5 +203,5 @@ export default function (pi: ExtensionAPI) {
             .join("\n"),
       },
     };
-  });
+  }
 }
