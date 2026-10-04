@@ -11,3 +11,5 @@ Local changes:
   the agent-browser skill instead of a broken relay; simple fetch tasks ~1s Jev overhead, no gain.
 - `src/jev.ts`: client timeout 5s, no retries (SDK default 10s x 3 attempts stalled a prompt ~31s when the
   endpoint hung; every Jev caller already fails open).
+- `src/triage.ts` (new): per-prompt Jev triage + risky tool-call approval gate, adapted from a Planejoo
+  Jev-MVP (`scripts/jev-triage.ts`): same four questions and keyword-first policy, minus project/model routing.
