@@ -13,3 +13,11 @@ Local changes:
   endpoint hung; every Jev caller already fails open).
 - `src/triage.ts` (new): per-prompt Jev triage + risky tool-call approval gate, adapted from a Planejoo
   Jev-MVP (`scripts/jev-triage.ts`): same four questions and keyword-first policy, minus project/model routing.
+- `jev_browse` tool (new: `src/browse.ts`, `src/browse-cdp.ts`): TypeScript port of browser-use/jev-ultrafast@main
+  (MIT). Policy, prompts, DOM snapshot, freshness guards, settle waits and loop bounds match upstream. Differences:
+  raw CDP over WebSocket replaces Browser Harness (private headless Chrome by default, `cdp_url` attaches to a
+  running Chrome); the TYPE_TEXT helper is omp's `smol` role (`JEV_BROWSE_TEXT_MODEL` overrides), not OpenRouter;
+  the inspector UI and recording scripts are not ported. `JevClient.systemOne` gives it raw answers with a 25s timeout and
+  2 retries (upstream values), off the 5s hot-path client settings. Behaviour fixes (upstream drives a headed Chrome and
+  never hit them): anti-throttling flags plus a foreground target in owned headless Chrome; `RESOLVE_TARGET` scrolls a
+  container-clipped target into view once before the hit test; budgets end the run `blocked` with history.
