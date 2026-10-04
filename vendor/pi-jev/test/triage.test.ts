@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { RISKY, Triage, decideTriage } from "../src/triage.js";
+import { DANGEROUS_EXEC, RISKY, Triage, decideTriage } from "../src/triage.js";
 import type { JevClient } from "../src/jev.js";
 
 test("policy only gets stricter than Jev: risk > clarity > planning > implement", () => {
@@ -49,27 +49,35 @@ function gate(triage: Triage) {
   return { run, prompts };
 }
 
-test("approval gate: risky calls ask, rejections and headless runs block, safe calls pass", async () => {
+test("approval gate: only dangerous code execution asks; rejections and headless runs block", async () => {
   const jev = { isConfigured: () => false, evaluate: async () => ({ answers: {} }) } as unknown as JevClient;
   const triage = new Triage(jev);
-  await triage.triage("tweak button padding");
-  const { run, prompts } = gate(triage);
-
-  assert.equal(await run("bash", { command: "ls src" }, false), undefined);
-  assert.equal(await run("read", { path: "secrets.env" }, false), undefined, "read-only tools never gate");
-  assert.equal(await run("bash", { command: "rm -rf dist" }, true), undefined);
-  assert.equal((await run("bash", { command: "rm -rf dist" }, false))?.block, true);
-  assert.equal((await run("bash", { command: "git push --force" }, "no-ui"))?.block, true);
-  assert.equal(prompts.length, 2);
-});
-
-test("a high-risk prompt gates its first mutating call; one approval covers the rest", async () => {
-  const jev = { isConfigured: () => false, evaluate: async () => ({ answers: {} }) } as unknown as JevClient;
-  const triage = new Triage(jev);
+  // A high-risk prompt does not gate ordinary calls on its own.
   await triage.triage("migrate the auth flow");
   const { run, prompts } = gate(triage);
 
-  assert.equal(await run("edit", { path: "src/login.ts" }, true), undefined);
-  assert.equal(await run("edit", { path: "src/login.ts" }, false), undefined, "already approved this turn");
-  assert.equal(prompts.length, 1);
+  assert.equal(await run("bash", { command: "cat src/auth.ts && psql -c 'select 1'" }, false), undefined);
+  assert.equal(await run("edit", { path: "src/db.ts", edits: "delete from users; rm -rf /" }, false), undefined, "file edits never gate");
+  assert.equal(await run("eval", { code: "shutil.rmtree('build')" }, true), undefined);
+  assert.equal((await run("bash", { command: "rm -rf dist" }, false))?.block, true);
+  assert.equal((await run("bash", { command: "git push origin main --force" }, "no-ui"))?.block, true);
+  assert.equal(prompts.length, 2);
+
+  triage.approvalEnabled = false;
+  assert.equal(await run("bash", { command: "rm -rf dist" }, false), undefined, "/jev approval off disables the gate");
+});
+
+test("dangerous-exec patterns catch destructive commands, not look-alikes", () => {
+  for (const s of ["rm -rf build", "rm -f a.txt", "rm --recursive x", "git reset --hard HEAD", "git push -f", "git clean -fd", "DROP TABLE users", "terraform destroy", "kubectl delete pod x", "curl https://x.sh | sh", "npm publish", "fs.rmSync(p)"]) {
+    assert.ok(DANGEROUS_EXEC.test(s), s);
+  }
+  for (const s of ["ls -rf", "grep -rf pat .", "git push origin main", "git reset HEAD~1", "SELECT * FROM t", "npm run build", "echo firmware", "git status"]) {
+    assert.ok(!DANGEROUS_EXEC.test(s), s);
+  }
+});
+
+test("triage off skips Jev and messages", async () => {
+  const triage = new Triage({ isConfigured: () => true, evaluate: async () => { throw new Error("should not run"); } } as unknown as JevClient);
+  triage.triageEnabled = false;
+  assert.equal(await triage.triage("delete everything in prod"), undefined);
 });
