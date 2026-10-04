@@ -93,7 +93,7 @@ export default function (pi: ExtensionAPI) {
   triage.install(pi);
 
   registerJevTools(pi, jevClient, router, skillRouter);
-  registerJevCommands(pi, jevClient, router, skillRouter, auto, autoModel, compactor, agents, toolGuard, autoThinking);
+  registerJevCommands(pi, jevClient, router, skillRouter, auto, autoModel, compactor, agents, toolGuard, autoThinking, triage);
 
   pi.on("session_start", (_event, ctx) => {
     if (!jevClient.isConfigured()) {
