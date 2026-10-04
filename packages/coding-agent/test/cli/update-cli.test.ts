@@ -64,6 +64,22 @@ describe("getLatestRelease fork releases", () => {
 		});
 		expect(urls).toEqual(["https://api.github.com/repos/kaioposnky/oh-my-pi/releases/latest"]);
 	});
+	it("carries this platform's release binary digest so same-version rebuilds are detectable", async () => {
+		const digest = `sha256:${"A".repeat(64)}`;
+		stubGitHub({
+			"/repos/kaioposnky/oh-my-pi/releases/latest": {
+				tag_name: "v999.1.0",
+				assets: [
+					{ name: "omp-unrelated", digest: `sha256:${"b".repeat(64)}` },
+					{
+						name: `omp-${process.platform === "win32" ? "windows" : process.platform}-${process.arch}${process.platform === "win32" ? ".exe" : ""}`,
+						digest,
+					},
+				],
+			},
+		});
+		expect((await getLatestRelease()).binaryDigest).toBe(digest.toLowerCase());
+	});
 	it("rejects the canary channel because the fork publishes stable GitHub binaries only", async () => {
 		await expect(getLatestRelease({ channel: "canary" })).rejects.toThrow(/does not publish canary builds/);
 	});
