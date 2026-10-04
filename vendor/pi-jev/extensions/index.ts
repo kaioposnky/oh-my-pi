@@ -100,10 +100,8 @@ export default function (pi: ExtensionAPI) {
       ctx.ui.setStatus("jev", "jev: unconfigured");
       return;
     }
-    ctx.ui.setStatus(
-      "jev",
-      autoModel.enabled ? "jev: auto-model" : auto.enabled ? "jev: auto" : "jev: ready"
-    );
+    // Idle "ready" is noise; only show a status when a non-default mode is on.
+    if (autoModel.enabled || auto.enabled) ctx.ui.setStatus("jev", autoModel.enabled ? "jev: auto-model" : "jev: auto");
   });
 
   pi.on("session_before_compact", async (event, ctx) => {
