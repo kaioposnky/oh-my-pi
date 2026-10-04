@@ -103,6 +103,28 @@ export class JevClient {
     return this.client;
   }
 
+  /**
+   * Raw System One call with full answer objects (choice/confidence/probabilities), for callers that validate
+   * the distribution themselves (jev_browse). Off the prompt hot path, so it uses upstream jev-ultrafast's
+   * 25s timeout and retries 408/429/5xx twice; a failed decision executes nothing.
+   */
+  public async systemOne(
+    request: { state: Record<string, unknown>; questions: Record<string, unknown>; model?: string },
+    signal?: AbortSignal
+  ): Promise<{ answers: Record<string, any>; usage?: any; model?: string }> {
+    const startTime = Date.now();
+    try {
+      const response: any = await this.getClient().systemOne(request as any, { signal, timeout: 25_000, retry: { maxRetries: 2 } });
+      this.stats.requestsCount += 1;
+      this.stats.totalTokens += (response.usage?.input_tokens ?? 0) + (response.usage?.output_tokens ?? 0);
+      this.stats.lastElapsedMs = Date.now() - startTime;
+      return response;
+    } catch (err: any) {
+      this.stats.lastError = err?.message || String(err);
+      throw err;
+    }
+  }
+
   public async evaluate(
     request: JevEvaluationRequest,
     signal?: AbortSignal

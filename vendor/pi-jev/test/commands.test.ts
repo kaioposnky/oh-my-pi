@@ -186,8 +186,8 @@ test("/jev enable and /jev disable only touch this extension's tools", async () 
   const { run, calls, active } = harness({});
 
   await run("enable");
-  assert.deepEqual(active().sort(), ["jev_evaluate", "jev_find_skill", "jev_find_tools", "read"]);
-  assert.match(calls.at(-1)!.message, /Jev tools \(jev_find_tools, jev_find_skill, jev_evaluate\) enabled/);
+  assert.deepEqual(active().sort(), ["jev_browse", "jev_evaluate", "jev_find_skill", "jev_find_tools", "read"]);
+  assert.match(calls.at(-1)!.message, /Jev tools \(jev_find_tools, jev_find_skill, jev_evaluate, jev_browse\) enabled/);
 
   await run("disable");
   assert.deepEqual(active(), ["read"]);

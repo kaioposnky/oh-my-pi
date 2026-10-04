@@ -229,6 +229,24 @@ Used for structured decisions, classifications, triage, and scoring.
 }
 ```
 
+### 4. `jev_browse`
+Fast browser agent ported from [browser-use/jev-ultrafast](https://github.com/browser-use/jev-ultrafast). Each step
+builds an indexed table of the page's visible controls; one Jev request picks the operation (`CLICK`, `TYPE_TEXT`,
+`SELECT`, `SCROLL_UP/DOWN`, `WAIT`, `DONE`, `BLOCKED`) and, speculatively, a target for every operation. A small
+model (the `smol` role, or `JEV_BROWSE_TEXT_MODEL`) writes text only for `TYPE_TEXT`. Model output never becomes
+selectors, coordinates or scripts; every input rechecks page freshness and click occlusion first.
+
+```json
+{ "url": "https://en.wikipedia.org/wiki/Main_Page", "goal": "Open the article about Gödel's incompleteness theorems." }
+```
+
+Optional: `cdp_url` (attach to a running Chrome to reuse its logins; default is a private headless Chrome found on
+`PATH`, or `JEV_BROWSE_CHROME`), `screenshot` (attach the final page). Bounds: 60 actions, 120 Jev requests, stop after
+3 unchanged actions. Out of scope, as upstream: shadow roots, iframes, canvas, uploads, pop-up tabs. `DONE` is the
+agent's claim; verify the returned page text.
+
+Guard checks against a local Chrome (no model calls): `npx tsx scripts/check-browse-guards.ts`.
+
 ## Development & Testing
 
 ```bash
