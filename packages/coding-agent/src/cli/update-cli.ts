@@ -9,7 +9,7 @@ import * as os from "node:os";
 import * as path from "node:path";
 import { Transform } from "node:stream";
 import { pipeline } from "node:stream/promises";
-import { $env, $which, APP_NAME, compareVersions, isEnoent, VERSION } from "@oh-my-pi/pi-utils";
+import { $env, $which, APP_NAME, compareVersions, isCompiledBinary, isEnoent, VERSION } from "@oh-my-pi/pi-utils";
 import chalk from "@oh-my-pi/pi-utils/chalk";
 import { withFileLock } from "@oh-my-pi/pi-utils/file-lock";
 import { $ } from "bun";
@@ -97,6 +97,22 @@ export interface ReleaseInfo {
 	 * so the install sees the same catalog as the check. See #1686.
 	 */
 	registry: string;
+	/**
+	 * GitHub's `sha256:<hex>` digest of this platform's release binary. Fork releases are rebuilt
+	 * under the same version label, so equal versions can still be different builds.
+	 */
+	binaryDigest?: string;
+}
+
+/**
+ * True when this process is a compiled binary whose bytes differ from the release asset: same
+ * version label, different build (the fork re-releases a version after rebasing/adding commits).
+ */
+async function installedBuildDiffers(binaryDigest: string | undefined): Promise<boolean> {
+	if (!binaryDigest || !isCompiledBinary()) return false;
+	const hash = new Bun.SHA256();
+	for await (const chunk of Bun.file(process.execPath).stream()) hash.update(chunk);
+	return `sha256:${hash.digest("hex")}` !== binaryDigest;
 }
 
 /** A release binary the updater can download, resolved from published GitHub release metadata. */
@@ -932,6 +948,18 @@ export async function getLatestRelease(
 		throw new Error(`Malformed GitHub release response for ${REPO}: missing tag_name`);
 	}
 	const version = data.tag_name.replace(/^v/, "");
+	let binaryDigest: string | undefined;
+	try {
+		const binaryName = getBinaryName();
+		const asset = Array.isArray(data.assets)
+			? data.assets.find(entry => isRecord(entry) && entry.name === binaryName)
+			: undefined;
+		if (isRecord(asset) && typeof asset.digest === "string" && /^sha256:[0-9a-f]{64}$/i.test(asset.digest)) {
+			binaryDigest = asset.digest.toLowerCase();
+		}
+	} catch {
+		// Unsupported platform: no build comparison, version comparison still applies.
+	}
 	return {
 		tag: `v${version}`,
 		version,
@@ -941,6 +969,7 @@ export async function getLatestRelease(
 		// field is required by `ReleaseInfo` and read only by the bun/npm
 		// install paths, which `dist: "binary"` never reaches.
 		registry: DEFAULT_NPM_REGISTRY,
+		binaryDigest,
 	};
 }
 
@@ -2182,8 +2211,9 @@ export async function runUpdateCommand(opts: {
 	}
 
 	const comparison = compareVersions(release.version, VERSION);
+	const rebuilt = comparison === 0 && (await installedBuildDiffers(release.binaryDigest));
 
-	if (comparison <= 0 && !opts.force && !isChannelSwitch) {
+	if (comparison <= 0 && !rebuilt && !opts.force && !isChannelSwitch) {
 		const icon = theme?.status?.success ?? "✔";
 		console.log(chalk.green(`${icon} Already up to date`));
 		return;
@@ -2197,6 +2227,8 @@ export async function runUpdateCommand(opts: {
 		);
 	} else if (comparison > 0) {
 		console.log(chalk.cyan(`New version available: ${release.version}`));
+	} else if (rebuilt) {
+		console.log(chalk.cyan(`New build of ${release.version} available (installed binary differs from the release)`));
 	} else {
 		console.log(chalk.yellow(`Forcing reinstall of ${release.version}`));
 	}
