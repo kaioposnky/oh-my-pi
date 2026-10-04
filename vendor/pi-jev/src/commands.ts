@@ -8,6 +8,7 @@ import type { JevCompactor } from "./compact.js";
 import type { AgentOrchestrator } from "./orchestrator.js";
 import type { ToolGuard } from "./tool-guard.js";
 import type { AutoThinkingRouter } from "./thinking.js";
+import type { Triage } from "./triage.js";
 import { designEvaluation } from "./designer.js";
 import type { JevEvaluationRequest } from "./types.js";
 import { JEV_TOOL_NAMES, isJevTool } from "./types.js";
@@ -23,13 +24,15 @@ export function registerJevCommands(
   compactor?: JevCompactor,
   agents?: AgentOrchestrator,
   toolGuard?: ToolGuard,
-  autoThinking?: AutoThinkingRouter
+  autoThinking?: AutoThinkingRouter,
+  triage?: Pick<Triage, "triageEnabled" | "approvalEnabled">
 ): void {
   const agentMode = agents ?? { enabled: false, setEnabled: () => {}, dispatch: async () => ({ accepted: false, error: "disabled" }) };
   const compactMode = compactor ?? { enabled: false, setEnabled: () => {} };
   const modelMode = autoModel ?? { enabled: false, setEnabled: () => {} };
   const guardMode = toolGuard ?? { enabled: false, setEnabled: () => {} };
   const thinkingMode = autoThinking ?? { enabled: false, setEnabled: () => {} };
+  const triageMode = triage ?? { triageEnabled: false, approvalEnabled: false };
   pi.registerCommand("jev", {
     description: "Manage TypeSafe Jev integration (status, enable, disable, auto, test, skills)",
     handler: async (args: string, ctx: ExtensionCommandContext) => {
@@ -37,7 +40,7 @@ export function registerJevCommands(
       const sub = (tokens[0] ?? "").toLowerCase();
       const rest = tokens.slice(1).join(" ");
       const usage =
-        "Available options: /jev status, /jev skills [query], /jev test [prompt], /jev enable, /jev disable, /jev auto [on|off], /jev auto-model [on|off], /jev thinking [on|off], /jev compact [on|off], /jev auto-agents [on|off], /jev tool-guard [on|off], /jev agents [task]";
+        "Available options: /jev status, /jev skills [query], /jev test [prompt], /jev enable, /jev disable, /jev auto [on|off], /jev auto-model [on|off], /jev thinking [on|off], /jev compact [on|off], /jev auto-agents [on|off], /jev tool-guard [on|off], /jev triage [on|off], /jev approval [on|off], /jev agents [task]";
 
       if (sub === "status" || sub === "") {
         const origin = jevClient.getKeyOrigin();
@@ -61,6 +64,8 @@ export function registerJevCommands(
             `• Tool guard: ${guardMode.enabled ? "on" : "off"}\n` +
             `• Jev compaction: ${compactMode.enabled ? "on" : "off"}\n` +
             `• Agent orchestration: ${agentMode.enabled ? "on" : "off"}\n` +
+            `• Task triage: ${triageMode.triageEnabled ? "on" : "off"}\n` +
+            `• Dangerous-exec approval: ${triageMode.approvalEnabled ? "on" : "off"}\n` +
             `• Active tools: ${activeTools.length} / Available: ${allTools.length} (${routable} routable)\n` +
             (jevClient.stats.lastError ? `• Last error: ${jevClient.stats.lastError}` : ""),
           "info"
@@ -179,6 +184,24 @@ export function registerJevCommands(
         }
         const result = await agentMode.dispatch(rest, ctx);
         if (!result.accepted) ctx.ui.notify(`Agent orchestration unavailable: ${result.error ?? "unknown error"}`, "warning");
+        return;
+      }
+
+      if (sub === "triage" || sub === "approval") {
+        const arg = rest.toLowerCase();
+        if (arg !== "" && arg !== "on" && arg !== "off") {
+          ctx.ui.notify(`Unknown /jev ${sub} argument "${rest}". ${usage}`, "warning");
+          return;
+        }
+        const key = sub === "triage" ? "triageEnabled" : "approvalEnabled";
+        const enabled = arg === "on" ? true : arg === "off" ? false : !triageMode[key];
+        triageMode[key] = enabled;
+        ctx.ui.notify(
+          sub === "triage"
+            ? `Jev task triage ${enabled ? "enabled" : "disabled"}.`
+            : `Approval for dangerous code execution ${enabled ? "enabled" : "disabled"}.`,
+          "info"
+        );
         return;
       }
 
