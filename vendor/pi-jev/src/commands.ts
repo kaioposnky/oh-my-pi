@@ -10,6 +10,7 @@ import type { ToolGuard } from "./tool-guard.js";
 import type { AutoThinkingRouter } from "./thinking.js";
 import type { Triage } from "./triage.js";
 import { designEvaluation } from "./designer.js";
+import { consequenceOverride } from "./consequence.js";
 import type { JevEvaluationRequest } from "./types.js";
 import { JEV_TOOL_NAMES, isJevTool } from "./types.js";
 import { JEV_THRESHOLD } from "./skills.js";
@@ -40,7 +41,7 @@ export function registerJevCommands(
       const sub = (tokens[0] ?? "").toLowerCase();
       const rest = tokens.slice(1).join(" ");
       const usage =
-        "Available options: /jev status, /jev skills [query], /jev test [prompt], /jev enable, /jev disable, /jev auto [on|off], /jev auto-model [on|off], /jev thinking [on|off], /jev compact [on|off], /jev auto-agents [on|off], /jev tool-guard [on|off], /jev triage [on|off], /jev approval [on|off], /jev agents [task]";
+        "Available options: /jev status, /jev skills [query], /jev test [prompt], /jev enable, /jev disable, /jev auto [on|off], /jev auto-model [on|off], /jev thinking [on|off], /jev compact [on|off], /jev auto-agents [on|off], /jev tool-guard [on|off], /jev triage [on|off], /jev approval [on|off], /jev consequence [on|off], /jev agents [task]";
 
       if (sub === "status" || sub === "") {
         const origin = jevClient.getKeyOrigin();
@@ -66,6 +67,11 @@ export function registerJevCommands(
             `• Agent orchestration: ${agentMode.enabled ? "on" : "off"}\n` +
             `• Task triage: ${triageMode.triageEnabled ? "on" : "off"}\n` +
             `• Dangerous-exec approval: ${triageMode.approvalEnabled ? "on" : "off"}\n` +
+            `• Consequence gate: ${
+              consequenceOverride.enabled === null
+                ? `env (${process.env.PI_JEV_CONSEQUENCE?.trim() === "0" ? "off" : "on"})`
+                : consequenceOverride.enabled ? "on" : "off"
+            }\n` +
             `• Active tools: ${activeTools.length} / Available: ${allTools.length} (${routable} routable)\n` +
             (jevClient.stats.lastError ? `• Last error: ${jevClient.stats.lastError}` : ""),
           "info"
@@ -202,6 +208,19 @@ export function registerJevCommands(
             : `Approval for dangerous code execution ${enabled ? "enabled" : "disabled"}.`,
           "info"
         );
+        return;
+      }
+
+      if (sub === "consequence") {
+        const arg = rest.toLowerCase();
+        if (arg !== "" && arg !== "on" && arg !== "off") {
+          ctx.ui.notify(`Unknown /jev ${sub} argument "${rest}". ${usage}`, "warning");
+          return;
+        }
+        const prev = consequenceOverride.enabled;
+        const enabled = arg === "on" ? true : arg === "off" ? false : !(prev ?? process.env.PI_JEV_CONSEQUENCE?.trim() !== "0");
+        consequenceOverride.enabled = enabled;
+        ctx.ui.notify(`Consequence gate ${enabled ? "enabled" : "disabled"}.`, "info");
         return;
       }
 

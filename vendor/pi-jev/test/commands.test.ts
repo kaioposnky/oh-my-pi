@@ -1,6 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { registerJevCommands } from "../src/commands.js";
+import { consequenceOverride } from "../src/consequence.js";
 import type { JevClient } from "../src/jev.js";
 import type { ToolRouter } from "../src/router.js";
 import type { SkillRouter } from "../src/skills.js";
@@ -199,4 +200,26 @@ test("/jev help lists usage at info level instead of warning", async () => {
 
   assert.match(calls.at(-1)!.message, /\/jev auto \[on\|off\]/);
   assert.equal(calls.at(-1)!.level, "info");
+});
+
+test("/jev consequence toggles the runtime override", async () => {
+  const { run, calls } = harness({});
+  try {
+    await run("consequence off");
+    assert.match(calls.at(-1)!.message, /Consequence gate disabled/);
+    assert.equal(consequenceOverride.enabled, false);
+
+    await run("consequence on");
+    assert.match(calls.at(-1)!.message, /Consequence gate enabled/);
+    assert.equal(consequenceOverride.enabled, true);
+
+    await run("consequence");
+    assert.equal(consequenceOverride.enabled, false);
+
+    await run("consequence bogus");
+    assert.match(calls.at(-1)!.message, /Unknown \/jev consequence argument/);
+    assert.equal(consequenceOverride.enabled, false);
+  } finally {
+    consequenceOverride.enabled = null;
+  }
 });
