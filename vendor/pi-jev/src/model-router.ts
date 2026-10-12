@@ -1,6 +1,7 @@
 import type { ExtensionContext, ExtensionAPI } from "@earendil-works/pi-coding-agent";
 import type { Model } from "@earendil-works/pi-ai";
 import type { JevClient } from "./jev.js";
+import type { SpawnProfile } from "./spawn-router.js";
 
 export type ModelProfile = "fast" | "balanced" | "reasoning" | "long-context" | "vision" | "url";
 export type ModelErrorKind = "quota" | "rate-limit" | "context-limit" | "unavailable" | "timeout" | "auth" | "unknown";
@@ -169,6 +170,27 @@ export interface ModelPlanResult {
 export function requiredConfidence(costUsd: number, min = 0.5, max = 0.99, scale = 5): number {
   if (!Number.isFinite(costUsd) || costUsd <= 0) return min;
   return min + (max - min) * (1 - Math.exp(-costUsd / scale));
+}
+
+/** Spawn-profile vocabulary maps onto the richer ModelProfile used for scoring. */
+const SPAWN_TO_MODEL_PROFILE: Record<SpawnProfile, ModelProfile> = {
+  fast: "fast",
+  balanced: "balanced",
+  reasoning: "reasoning",
+  long_context: "long-context",
+};
+
+/** Pattern (model id) of the best available model for a spawn profile, or
+ * undefined when there is nothing to pick from. Capability decides the class;
+ * cheaper input cost and known pricing break ties within that class. Takes the
+ * models array (not ctx) so it stays a pure, testable decision. */
+export function pickModelPatternForProfile(profile: SpawnProfile, models: Model<any>[]): string | undefined {
+  if (models.length === 0) return undefined;
+  const modelProfile = SPAWN_TO_MODEL_PROFILE[profile];
+  const bestFit = Math.max(...models.map((model) => capabilityFit(model, modelProfile)));
+  const contenders = models.filter((model) => bestFit - capabilityFit(model, modelProfile) <= FIT_TOLERANCE);
+  const inputCost = (model: Model<any>) => (hasKnownCost(model) ? model.cost.input : Number.POSITIVE_INFINITY);
+  return contenders.reduce((best, model) => (inputCost(model) < inputCost(best) ? model : best)).id;
 }
 
 export class AutoModelRouter {
