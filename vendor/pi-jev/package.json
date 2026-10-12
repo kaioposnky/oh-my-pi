@@ -6,7 +6,9 @@
   "main": "extensions/index.ts",
   "bin": {
     "pi-jev-gate": "./bin/jev-gate.js",
-    "jev-gate": "./bin/jev-gate.js"
+    "jev-gate": "./bin/jev-gate.js",
+    "pi-jev-hook": "./bin/jev-install-hook.js",
+    "jev-hook": "./bin/jev-install-hook.js"
   },
   "keywords": [
     "pi-package",
@@ -34,6 +36,7 @@
   "scripts": {
     "typecheck": "tsc --noEmit",
     "test": "node --test --import tsx test/*.test.ts",
+    "jev-hook": "node bin/jev-install-hook.js",
     "smoke": "pi -ne -e ./extensions/index.ts -p --no-session \"list loaded tools\""
   },
   "engines": {
