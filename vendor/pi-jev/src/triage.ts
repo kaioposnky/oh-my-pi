@@ -1,5 +1,6 @@
 import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
 import type { JevClient } from "./jev.js";
+import { assessConsequence, decideApproval } from "./consequence.js";
 import { JEV_THRESHOLD } from "./skills.js";
 import type { QuestionConfig } from "./types.js";
 
@@ -132,9 +133,21 @@ export class Triage {
       if (!this.approvalEnabled || !EXEC_TOOLS[event.toolName]) return;
       const input = JSON.stringify(event.input);
       const match = DANGEROUS_EXEC.exec(input)?.[0];
-      if (!match) return;
+      const keywordRisky = Boolean(match);
+      // Jev consequence check runs whenever configured (fail-closed: a failed
+      // or disabled Jev call yields undefined and the keyword rules stand).
+      const jev = this.jevClient.isConfigured()
+        ? await assessConsequence(this.jevClient, event.toolName, event.input, ctx.signal)
+        : undefined;
+      const decision = decideApproval(keywordRisky, jev);
+      if (!decision.requireApproval) {
+        if (decision.relaxed && ctx.hasUI) ctx.ui.setStatus("jev", "jev: consequence auto-approved");
+        return;
+      }
 
-      const why = `runs a destructive operation ("${match.trim()}")`;
+      const why = match
+        ? `runs a destructive operation ("${match.trim()}")`
+        : `was flagged by Jev (${decision.reason})`;
       if (!ctx.hasUI) {
         return { block: true, reason: `Blocked: this ${event.toolName} call ${why} and needs user approval, but no UI is available to ask. Tell the user what you intended to run.` };
       }
