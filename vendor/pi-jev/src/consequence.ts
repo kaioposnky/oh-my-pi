@@ -13,6 +13,9 @@ export interface ApprovalDecision {
   relaxed?: boolean;
 }
 
+/** Runtime override for the consequence gate; null = fall back to PI_JEV_CONSEQUENCE env. */
+export const consequenceOverride: { enabled: boolean | null } = { enabled: null };
+
 /**
  * Consequence-gated approval policy over Jev's assessment; rules may only be
  * stricter than the keyword gate, never looser — except the explicit row-1
@@ -75,7 +78,8 @@ export async function assessConsequence(
   input: unknown,
   signal?: AbortSignal
 ): Promise<ConsequenceAssessment | undefined> {
-  if (process.env.PI_JEV_CONSEQUENCE?.trim() === "0") return undefined;
+  if (consequenceOverride.enabled === false) return undefined;
+  if (consequenceOverride.enabled === null && process.env.PI_JEV_CONSEQUENCE?.trim() === "0") return undefined;
   if (!jevClient.isConfigured()) return undefined;
   try {
     const serialized = JSON.stringify(input).replace(/\s+/g, " ").slice(0, MAX_INPUT_CHARS);
