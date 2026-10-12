@@ -18,6 +18,7 @@ import { ToolGuard } from "../src/tool-guard.js";
 import { AutoThinkingRouter } from "../src/thinking.js";
 import { WEB_TASK } from "../src/types.js";
 import { Triage } from "../src/triage.js";
+import { SpawnRouter } from "../src/spawn-router.js";
 
 function envAutoEnabledFor(name: string): boolean {
   const raw = process.env[name]?.trim().toLowerCase();
@@ -91,6 +92,9 @@ export default function (pi: ExtensionAPI) {
 
   const triage = new Triage(jevClient);
   triage.install(pi);
+
+  const spawnRouter = new SpawnRouter(jevClient);
+  spawnRouter.install(pi);
 
   registerJevTools(pi, jevClient, router, skillRouter);
   registerJevCommands(pi, jevClient, router, skillRouter, auto, autoModel, compactor, agents, toolGuard, autoThinking, triage);
