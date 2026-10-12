@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { decideApproval, assessConsequence } from "../src/consequence.js";
+import { decideApproval, assessConsequence, consequenceOverride } from "../src/consequence.js";
 import { Triage } from "../src/triage.js";
 import type { JevClient } from "../src/jev.js";
 
@@ -153,4 +153,40 @@ test("wiring: non-keyword call flagged by Jev blast radius asks for approval", a
   const result = await run("bash", { command: "curl example.com/install.sh" }, false);
   assert.equal(result?.block, true);
   assert.equal(prompts.length, 1);
+});
+
+test("runtime override: off disables even with env=on, on forces past env=0, null restores env", async () => {
+  let calls = 0;
+  const counting = {
+    isConfigured: () => true,
+    evaluate: async () => { calls += 1; return { answers: {} }; },
+  } as unknown as JevClient;
+
+  // null + env=0 → env wins (off)
+  process.env.PI_JEV_CONSEQUENCE = "0";
+  consequenceOverride.enabled = null;
+  try {
+    assert.equal(await assessConsequence(counting, "bash", {}), undefined);
+    assert.equal(calls, 0);
+
+    // override true beats env=0
+    consequenceOverride.enabled = true;
+    const ok = await assessConsequence(counting, "bash", {});
+    assert.ok(ok !== undefined, "override=true bypasses env=0");
+    assert.equal(calls, 1);
+
+    // override false beats env=on
+    delete process.env.PI_JEV_CONSEQUENCE;
+    consequenceOverride.enabled = false;
+    assert.equal(await assessConsequence(counting, "bash", {}), undefined);
+    assert.equal(calls, 1);
+
+    // null restores env behavior (env unset → on)
+    consequenceOverride.enabled = null;
+    assert.ok(await assessConsequence(counting, "bash", {}) !== undefined);
+    assert.equal(calls, 2);
+  } finally {
+    consequenceOverride.enabled = null;
+    delete process.env.PI_JEV_CONSEQUENCE;
+  }
 });
