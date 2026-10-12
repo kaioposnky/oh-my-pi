@@ -10,6 +10,7 @@ import {
   modelStayCostUsd,
   modelSwitchCostUsd,
   FIT_TOLERANCE,
+  pickModelPatternForProfile,
   promptHasUrl,
   requiredConfidence,
   selectBestModel,
@@ -355,4 +356,36 @@ test("a malformed Jev answer is ignored rather than trusted", async () => {
   const result = await new AutoModelRouter(pi, true, malformedJev).route("debug this failing test", ctx, { prefixTokens: 1000 });
   assert.equal(result.confidence, undefined);
   assert.equal(result.changed, true);
+});
+
+// --- spawn profile -> model pattern -----------------------------------------
+
+test("empty model list yields no pattern", () => {
+  assert.equal(pickModelPatternForProfile("fast", []), undefined);
+});
+
+test("fast picks the cheapest fitting model", () => {
+  // Both fit "fast" (non-reasoning, fit 3); the reasoning model does not.
+  const pricey = model("expensive", { cost: { input: 5, output: 20, cacheRead: 0.5, cacheWrite: 6.25 } });
+  const cheap = model("cheap", { cost: { input: 0.5, output: 2, cacheRead: 0.05, cacheWrite: 0.625 } });
+  const reasoner = model("reasoner", { reasoning: true });
+  assert.equal(pickModelPatternForProfile("fast", [pricey, reasoner, cheap]), "cheap");
+});
+
+test("reasoning picks a reasoning-capable model", () => {
+  const plain = model("plain", { contextWindow: 400000 });
+  const reasoner = model("reasoner", { reasoning: true });
+  assert.equal(pickModelPatternForProfile("reasoning", [plain, reasoner]), "reasoner");
+});
+
+test("long_context maps to the long-context profile", () => {
+  const small = model("small", { contextWindow: 128000 });
+  const big = model("big", { contextWindow: 1000000, reasoning: true });
+  assert.equal(pickModelPatternForProfile("long_context", [small, big]), "big");
+});
+
+test("a model without known cost loses cost ties", () => {
+  const unpriced = model("unpriced", { cost: undefined });
+  const priced = model("priced", {});
+  assert.equal(pickModelPatternForProfile("balanced", [unpriced, priced]), "priced");
 });
