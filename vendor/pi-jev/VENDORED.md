@@ -21,3 +21,21 @@ Local changes:
   2 retries (upstream values), off the 5s hot-path client settings. Behaviour fixes (upstream drives a headed Chrome and
   never hit them): anti-throttling flags plus a foreground target in owned headless Chrome; `RESOLVE_TARGET` scrolls a
   container-clipped target into view once before the hit test; budgets end the run `blocked` with history.
+- `src/spawn-router.ts` (new): `before_subagent_spawn` handler routes auto-spawned subagents to a model pattern via one
+  batched Jev evaluate (clarity choice + profile choice fast/balanced/reasoning/long_context) and
+  `pickModelPatternForProfile` (`src/model-router.ts`). Skips `PI_JEV_SPAWN=0`, unconfigured Jev, and spawns whose
+  `patterns` the caller already set (explicit choice wins). Fail-open: any Jev error leaves the caller's default spawn.
+- `src/consequence.ts` (new, wired into `src/triage.ts`): DANGEROUS_EXEC keyword match plus a Jev consequence assess
+  (noul `reversible`, choice `scope` single_file/repo/system/external, `blast_radius` 0-10). Reversible >= 0.85 &&
+  blast_radius <= 3 && scope=single_file auto-approves; no keyword but blast_radius >= 7 or system+reversible < 0.5
+  requests approval. Fail-CLOSED on Jev errors (keyword rules still apply). `PI_JEV_CONSEQUENCE=0` /
+  `/jev consequence [on|off]` (runtime override, null = env fallback).
+- `src/completion.ts` (new): `session_stop` gate. Deterministic todo check (pending/in_progress/blocked always
+  continue, Jev cannot override) plus Jev noul `all_tasks_done`/`premature_stop`/`verification_done` (state: last user
+  prompt + last assistant text, 6000 chars each); prematureStop > 0.7 or allTasksDone < 0.7 continues with
+  `additionalContext`. Skips when `stop_hook_active` (loop guard; core caps continuations at 8).
+  `PI_JEV_COMPLETION=0` disables (completionOverride, null = env fallback). `verification_done` collected, ungated.
+- `src/hook-install.ts` (new; `bin/jev-install-hook.js` + runner, aliases `pi-jev-hook`/`jev-hook`): writes
+  `<repo>/.git/hooks/post-commit` (`exec node '<abs-bin>/jev-gate.js' <args>`, chmod 755). Flags `-c/--criteria`
+  (implies `--diff`), `--force`, `--repo`, `--args`. Existing hook is skipped unless `--force`.
+  Usage: `npx jev-hook -c "tests pass" --repo /path/to/repo`.
