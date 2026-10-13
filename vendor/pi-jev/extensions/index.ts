@@ -21,6 +21,7 @@ import { Triage } from "../src/triage.js";
 import { SpawnRouter } from "../src/spawn-router.js";
 import { CompletionVerifier } from "../src/completion.js";
 import { McpGate, mcpOverride } from "../src/mcp-gate.js";
+import { LearnGate } from "../src/learn-gate.js";
 
 function envAutoEnabledFor(name: string): boolean {
   const raw = process.env[name]?.trim().toLowerCase();
@@ -102,6 +103,9 @@ export default function (pi: ExtensionAPI) {
   completion.install(pi);
 
   const mcpGate = new McpGate(jevClient);
+
+  const learnGate = new LearnGate(jevClient);
+  learnGate.install(pi);
 
   registerJevTools(pi, jevClient, router, skillRouter);
   registerJevCommands(pi, jevClient, router, skillRouter, auto, autoModel, compactor, agents, toolGuard, autoThinking, triage);
