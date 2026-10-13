@@ -20,6 +20,7 @@ import { WEB_TASK } from "../src/types.js";
 import { Triage } from "../src/triage.js";
 import { SpawnRouter } from "../src/spawn-router.js";
 import { CompletionVerifier } from "../src/completion.js";
+import { McpGate, mcpOverride } from "../src/mcp-gate.js";
 
 function envAutoEnabledFor(name: string): boolean {
   const raw = process.env[name]?.trim().toLowerCase();
@@ -100,6 +101,8 @@ export default function (pi: ExtensionAPI) {
   const completion = new CompletionVerifier(jevClient);
   completion.install(pi);
 
+  const mcpGate = new McpGate(jevClient);
+
   registerJevTools(pi, jevClient, router, skillRouter);
   registerJevCommands(pi, jevClient, router, skillRouter, auto, autoModel, compactor, agents, toolGuard, autoThinking, triage);
 
@@ -137,6 +140,11 @@ export default function (pi: ExtensionAPI) {
   pi.on("before_agent_start", async (event, ctx) => {
     // Triage runs alongside routing (one extra ~0.3s Jev call, in parallel).
     const [decision, routed] = await Promise.all([triage.triage(event.prompt, ctx.signal), route(event, ctx)]);
+    // MCP injection gate: after routing settles, right-size the MCP toolset.
+    // Own try/catch — a gate failure must never break the main routing flow.
+    try {
+      await mcpGate.route(event.prompt, pi, { signal: ctx.signal, ui: ctx.ui });
+    } catch {}
     const triageText = decision && triage.message(decision);
     if (decision && decision.action !== "implement") ctx.ui.setStatus("jev", `jev: triage ${decision.action}`);
     if (!triageText) return routed;
