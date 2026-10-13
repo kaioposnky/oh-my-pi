@@ -2,6 +2,7 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import { registerJevCommands } from "../src/commands.js";
 import { consequenceOverride } from "../src/consequence.js";
+import { mcpOverride } from "../src/mcp-gate.js";
 import type { JevClient } from "../src/jev.js";
 import type { ToolRouter } from "../src/router.js";
 import type { SkillRouter } from "../src/skills.js";
@@ -221,5 +222,33 @@ test("/jev consequence toggles the runtime override", async () => {
     assert.equal(consequenceOverride.enabled, false);
   } finally {
     consequenceOverride.enabled = null;
+  }
+});
+
+test("/jev mcp toggles the runtime override", async () => {
+  const { run, calls } = harness({});
+  try {
+    await run("mcp off");
+    assert.match(calls.at(-1)!.message, /MCP gate disabled/);
+    assert.equal(mcpOverride.enabled, false);
+
+    await run("mcp on");
+    assert.match(calls.at(-1)!.message, /MCP gate enabled/);
+    assert.equal(mcpOverride.enabled, true);
+
+    await run("mcp");
+    assert.equal(mcpOverride.enabled, false);
+
+    await run("mcp bogus");
+    assert.match(calls.at(-1)!.message, /Unknown \/jev mcp argument/);
+    assert.equal(mcpOverride.enabled, false);
+
+    await run("status");
+    assert.match(calls.at(-1)!.message, /• MCP gate: off/);
+    mcpOverride.enabled = null;
+    await run("status");
+    assert.match(calls.at(-1)!.message, /• MCP gate: env \(on\)/);
+  } finally {
+    mcpOverride.enabled = null;
   }
 });
