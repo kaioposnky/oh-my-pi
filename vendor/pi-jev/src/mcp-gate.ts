@@ -79,6 +79,11 @@ function serverQuestion(server: string, tools: McpToolInfo[]): QuestionConfig {
  * Per-prompt MCP tool injection/retraction gate. Asks one batched Jev evaluate
  * (one noul question per server, ≤30 servers) and applies the diff with
  * setActiveTools. Never throws: any failure leaves the toolset untouched.
+ *
+ * Standalone evaluate (not folded into the auto batch) is deliberate: the
+ * auto-batch plumbing (ModelJudgmentContribution) is model-router-specific and
+ * folding mcp questions through it would need a route() split plus ~60 lines
+ * of coupling. This costs one extra call, and only when mcp tools exist.
  */
 export class McpGate {
   constructor(private jevClient: Pick<JevClient, "isConfigured" | "evaluate">) {}
