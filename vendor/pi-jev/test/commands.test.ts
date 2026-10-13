@@ -3,6 +3,7 @@ import assert from "node:assert/strict";
 import { registerJevCommands } from "../src/commands.js";
 import { consequenceOverride } from "../src/consequence.js";
 import { mcpOverride } from "../src/mcp-gate.js";
+import { learnOverride } from "../src/learn-gate.js";
 import type { JevClient } from "../src/jev.js";
 import type { ToolRouter } from "../src/router.js";
 import type { SkillRouter } from "../src/skills.js";
@@ -250,5 +251,33 @@ test("/jev mcp toggles the runtime override", async () => {
     assert.match(calls.at(-1)!.message, /• MCP gate: env \(on\)/);
   } finally {
     mcpOverride.enabled = null;
+  }
+});
+
+test("/jev learn toggles the runtime override", async () => {
+  const { run, calls } = harness({});
+  try {
+    await run("learn off");
+    assert.match(calls.at(-1)!.message, /Learn gate disabled/);
+    assert.equal(learnOverride.enabled, false);
+
+    await run("learn on");
+    assert.match(calls.at(-1)!.message, /Learn gate enabled/);
+    assert.equal(learnOverride.enabled, true);
+
+    await run("learn");
+    assert.equal(learnOverride.enabled, false);
+
+    await run("learn bogus");
+    assert.match(calls.at(-1)!.message, /Unknown \/jev learn argument/);
+    assert.equal(learnOverride.enabled, false);
+
+    await run("status");
+    assert.match(calls.at(-1)!.message, /• Learn gate: off/);
+    learnOverride.enabled = null;
+    await run("status");
+    assert.match(calls.at(-1)!.message, /• Learn gate: env \(on\)/);
+  } finally {
+    learnOverride.enabled = null;
   }
 });
