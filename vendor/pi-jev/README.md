@@ -14,6 +14,8 @@ Semantic tool routing and typed decisions for the [Pi coding agent](https://pi.d
 - **Spawn Model Routing (on by default)**: `PI_JEV_SPAWN=0` to disable. One batched Jev evaluate per auto-spawned subagent (clarity + profile) picks a fast/balanced/reasoning/long_context model pattern via `before_subagent_spawn`. Caller-set `patterns` always win; Jev failures leave the default spawn untouched (fail-open).
 - **Consequence-Gated Approvals (on by default)**: `/jev consequence [on|off]` / `PI_JEV_CONSEQUENCE=0`. Dangerous executions get a Jev blast-radius assess (reversible, scope, blast_radius 0-10): low-risk reversible single-file ops auto-approve, high blast radius requests approval. Fails closed on Jev errors; keyword rules always apply.
 - **Completion Verification (on by default)**: `PI_JEV_COMPLETION=0`. At `session_stop`, a deterministic todo check (pending/in_progress/blocked → always continue) plus Jev judgments (`premature_stop > 0.7` or `all_tasks_done < 0.7`) continue the session with feedback instead of letting it stop early. Loop-guarded via `stop_hook_active`.
+- **MCP Injection Gate (on by default)**: `/jev mcp [on|off]` / `PI_JEV_MCP=0`. Before each agent start, one batched Jev evaluate (a noul question per MCP server) injects a server's inactive tools at p ≥ 0.65 and retracts active ones at p ≤ 0.35; the dead zone in between never churns the toolset. Jev failures leave the toolset untouched (fail-open).
+- **Learn Gate (on by default)**: `/jev learn [on|off]` / `PI_JEV_LEARN=0`. `learn` tool calls are judged (durable, reusable) before reaching the memory bank: lessons below threshold are blocked with an explanation, everything else — including any Jev failure — passes through (fail-open). `novel` is informational only.
 - **Post-Commit Hook Installer (`jev-hook` CLI)**: `npx jev-hook -c "tests pass" --repo /path/to/repo` writes a `.git/hooks/post-commit` that runs `jev-gate` on the commit diff. Exits `0` installed (or skipped, existing hook untouched), `2` on error. `--force` overwrites.
 - **Dangerous-Execution Approval (on by default)**: `/jev approval [on|off]` / `PI_JEV_APPROVAL=0`. `bash`/`eval`/`ssh` calls running destructive operations (`rm -rf`, `git push --force`, `git reset --hard`, `DROP TABLE`, `terraform destroy`, `kubectl delete`, `curl | sh`, `npm publish`, `rmtree`...) need your confirmation; without a UI they are blocked. File edits and reads are never gated. Both switches show in `/jev status`.
 - **Automatic Model Mode (opt-in)**: `--jev-auto-model` / `PI_JEV_AUTO_MODEL=1` / `/jev auto-model on` selects fast, balanced, reasoning, long-context, or vision/URL models per prompt. Scores candidates by capability fit with real prefix-aware cache cost as a tie-breaker. Off by default.
@@ -219,6 +221,35 @@ Flags: `-c/--criteria` (implies `--diff`), `--force` (overwrite an existing hook
 Exit codes: `0` installed or skipped (an existing hook is never clobbered without `--force`), `2` on error. The hook
 embeds the absolute `jev-gate.js` path, so it needs no network at commit time.
 
+### MCP Injection Gate
+
+Before each agent start, one batched Jev evaluate asks a noul question per MCP server (`mcp:<server>`, with up to 3
+tool names and a 200-char description in the question; 30-server cap, task truncated to 6000 chars) and applies the
+whole diff as one `setActiveTools` replace:
+
+- Inject a server's inactive tools at p ≥ 0.65 (`JEV_THRESHOLD`); retract its active tools at p ≤ 0.35. Retraction
+  needs a stronger "no" than injection needs a "yes" — pulling tools the user relies on is worse than missing an
+  inactive one — and the 0.35–0.65 dead zone keeps the current state so a mediocre verdict never churns the toolset.
+- Status line reports the diff: `jev: mcp +N/-M`.
+- The evaluate is deliberately standalone: folding it into the auto-mode batch would couple the gate to
+  model-router's pendingQuestions plumbing.
+- Skips empty and slash prompts, sessions with no MCP tools, unconfigured Jev, and `PI_JEV_MCP=0`. Fail-open: a Jev
+  error leaves the toolset untouched. Toggle with `/jev mcp [on|off]`.
+
+### Learn Gate
+
+Intercepts `learn` tool calls and judges the would-be lesson with one batched Jev evaluate (noul `durable` /
+`reusable` / `novel`; state = lesson truncated to 6000 chars + context 2000 chars) before it reaches the memory bank:
+
+- `durable` ≥ 0.65 and `reusable` ≥ 0.65 → learn proceeds.
+- Any present-but-below-threshold field → the call is blocked with
+  `Jev learn gate: not durable or not reusable (durable X, reusable Y). Lesson skipped — memory bank kept clean.`
+  (status `jev: learn gate rejected`).
+- Missing judgment or missing field → learn (fail-open: unknown is not failing). Handler errors also fail open.
+- `novel` is informational only — it never gates (reserved for future dedup/novelty hints).
+- Skips calls with empty `input.memory` (pass-through without Jev), unconfigured Jev, and `PI_JEV_LEARN=0`.
+  Toggle with `/jev learn [on|off]`.
+
 ## Commands
 
 - `/jev status` — Shows Jev configuration, endpoint, API key origin, auto-mode state, session request count, total tokens, and available tool counts.
@@ -233,6 +264,8 @@ embeds the absolute `jev-gate.js` path, so it needs no network at commit time.
 - `/jev tool-guard [on|off]` — Turns tool call anti-hallucination validation and error guidance on or off.
 - `/jev compact [on|off]` — Turns Jev-guided compaction on or off. Run `/compact` after enabling.
 - `/jev consequence [on|off]` — Turns consequence-gated approvals for dangerous executions on or off (no argument flips it).
+- `/jev mcp [on|off]` — Turns the per-prompt MCP server injection/retraction gate on or off (no argument flips it).
+- `/jev learn [on|off]` — Turns the memory-bank learn gate on or off (no argument flips it).
 - `/jev agents <task>` — Dispatches the task to `pi-subagents`, which selects and coordinates available agents.
 - `/jev auto-agents [on|off]` — Enables automatic orchestration for complex architecture, refactoring, security, repository-wide, and migration prompts.
 
