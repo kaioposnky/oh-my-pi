@@ -12,6 +12,7 @@ import type { Triage } from "./triage.js";
 import { designEvaluation } from "./designer.js";
 import { consequenceOverride } from "./consequence.js";
 import { mcpOverride } from "./mcp-gate.js";
+import { learnOverride } from "./learn-gate.js";
 import type { JevEvaluationRequest } from "./types.js";
 import { JEV_TOOL_NAMES, isJevTool } from "./types.js";
 import { JEV_THRESHOLD } from "./skills.js";
@@ -42,7 +43,7 @@ export function registerJevCommands(
       const sub = (tokens[0] ?? "").toLowerCase();
       const rest = tokens.slice(1).join(" ");
       const usage =
-        "Available options: /jev status, /jev skills [query], /jev test [prompt], /jev enable, /jev disable, /jev auto [on|off], /jev auto-model [on|off], /jev thinking [on|off], /jev compact [on|off], /jev auto-agents [on|off], /jev tool-guard [on|off], /jev triage [on|off], /jev approval [on|off], /jev consequence [on|off], /jev mcp [on|off], /jev agents [task]";
+        "Available options: /jev status, /jev skills [query], /jev test [prompt], /jev enable, /jev disable, /jev auto [on|off], /jev auto-model [on|off], /jev thinking [on|off], /jev compact [on|off], /jev auto-agents [on|off], /jev tool-guard [on|off], /jev triage [on|off], /jev approval [on|off], /jev consequence [on|off], /jev mcp [on|off], /jev learn [on|off], /jev agents [task]";
 
       if (sub === "status" || sub === "") {
         const origin = jevClient.getKeyOrigin();
@@ -77,6 +78,11 @@ export function registerJevCommands(
               mcpOverride.enabled === null
                 ? `env (${process.env.PI_JEV_MCP?.trim() === "0" ? "off" : "on"})`
                 : mcpOverride.enabled ? "on" : "off"
+            }\n` +
+            `• Learn gate: ${
+              learnOverride.enabled === null
+                ? `env (${process.env.PI_JEV_LEARN?.trim() === "0" ? "off" : "on"})`
+                : learnOverride.enabled ? "on" : "off"
             }\n` +
             `• Active tools: ${activeTools.length} / Available: ${allTools.length} (${routable} routable)\n` +
             (jevClient.stats.lastError ? `• Last error: ${jevClient.stats.lastError}` : ""),
@@ -240,6 +246,19 @@ export function registerJevCommands(
         const enabled = arg === "on" ? true : arg === "off" ? false : !(prev ?? process.env.PI_JEV_MCP?.trim() !== "0");
         mcpOverride.enabled = enabled;
         ctx.ui.notify(`MCP gate ${enabled ? "enabled" : "disabled"}.`, "info");
+        return;
+      }
+
+      if (sub === "learn") {
+        const arg = rest.toLowerCase();
+        if (arg !== "" && arg !== "on" && arg !== "off") {
+          ctx.ui.notify(`Unknown /jev ${sub} argument "${rest}". ${usage}`, "warning");
+          return;
+        }
+        const prev = learnOverride.enabled;
+        const enabled = arg === "on" ? true : arg === "off" ? false : !(prev ?? process.env.PI_JEV_LEARN?.trim() !== "0");
+        learnOverride.enabled = enabled;
+        ctx.ui.notify(`Learn gate ${enabled ? "enabled" : "disabled"}.`, "info");
         return;
       }
 
