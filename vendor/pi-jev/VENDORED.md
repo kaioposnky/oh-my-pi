@@ -39,3 +39,18 @@ Local changes:
   `<repo>/.git/hooks/post-commit` (`exec node '<abs-bin>/jev-gate.js' <args>`, chmod 755). Flags `-c/--criteria`
   (implies `--diff`), `--force`, `--repo`, `--args`. Existing hook is skipped unless `--force`.
   Usage: `npx jev-hook -c "tests pass" --repo /path/to/repo`.
+- `src/mcp-gate.ts` (new): `before_agent_start` MCP injection gate. One batched Jev evaluate with a noul question per
+  MCP server (`mcp:<server>`, ≤3 tool names + 200-char description in the question, 30-server cap, task 6000 chars).
+  Asymmetric thresholds: inject a server's inactive tools at p >= 0.65 (JEV_THRESHOLD), retract active ones at
+  p <= 0.35 (pulling tools the user relies on is worse than missing an inactive one; dead zone 0.35-0.65 keeps the
+  current state so a mediocre verdict never churns the toolset). Applied as one setActiveTools full-replace, status
+  `jev: mcp +N/-M`. Standalone evaluate on purpose — folding it into the auto-mode batch would couple the gate to
+  model-router's pendingQuestions. Skips `PI_JEV_MCP=0`, override off, unconfigured, empty/slash prompts, no MCP
+  tools. Fail-open: Jev down → toolset untouched. `/jev mcp [on|off]` (runtime override, null = env fallback).
+- `src/learn-gate.ts` (new): intercepts `tool_call` toolName === "learn". One batched evaluate (noul durable/reusable/
+  novel; state lesson 6000 + context 2000 chars). decideLearn: no judgment or missing field → learn (fail-open,
+  unknown is not failing); durable >= 0.65 && reusable >= 0.65 → learn; a present-but-below-threshold field →
+  block `Jev learn gate: not durable or not reusable (durable X, reusable Y). Lesson skipped — memory bank kept
+  clean.` + status `jev: learn gate rejected`. `novel` is informational only — never gates (reserved for future
+  dedup/novelty hints). Skips `PI_JEV_LEARN=0`, override off, unconfigured, empty `input.memory`. Handler try/catch
+  fail-open. `/jev learn [on|off]` (runtime override, null = env fallback).
