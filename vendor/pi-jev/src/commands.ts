@@ -11,6 +11,7 @@ import type { AutoThinkingRouter } from "./thinking.js";
 import type { Triage } from "./triage.js";
 import { designEvaluation } from "./designer.js";
 import { consequenceOverride } from "./consequence.js";
+import { mcpOverride } from "./mcp-gate.js";
 import type { JevEvaluationRequest } from "./types.js";
 import { JEV_TOOL_NAMES, isJevTool } from "./types.js";
 import { JEV_THRESHOLD } from "./skills.js";
@@ -41,7 +42,7 @@ export function registerJevCommands(
       const sub = (tokens[0] ?? "").toLowerCase();
       const rest = tokens.slice(1).join(" ");
       const usage =
-        "Available options: /jev status, /jev skills [query], /jev test [prompt], /jev enable, /jev disable, /jev auto [on|off], /jev auto-model [on|off], /jev thinking [on|off], /jev compact [on|off], /jev auto-agents [on|off], /jev tool-guard [on|off], /jev triage [on|off], /jev approval [on|off], /jev consequence [on|off], /jev agents [task]";
+        "Available options: /jev status, /jev skills [query], /jev test [prompt], /jev enable, /jev disable, /jev auto [on|off], /jev auto-model [on|off], /jev thinking [on|off], /jev compact [on|off], /jev auto-agents [on|off], /jev tool-guard [on|off], /jev triage [on|off], /jev approval [on|off], /jev consequence [on|off], /jev mcp [on|off], /jev agents [task]";
 
       if (sub === "status" || sub === "") {
         const origin = jevClient.getKeyOrigin();
@@ -71,6 +72,11 @@ export function registerJevCommands(
               consequenceOverride.enabled === null
                 ? `env (${process.env.PI_JEV_CONSEQUENCE?.trim() === "0" ? "off" : "on"})`
                 : consequenceOverride.enabled ? "on" : "off"
+            }\n` +
+            `• MCP gate: ${
+              mcpOverride.enabled === null
+                ? `env (${process.env.PI_JEV_MCP?.trim() === "0" ? "off" : "on"})`
+                : mcpOverride.enabled ? "on" : "off"
             }\n` +
             `• Active tools: ${activeTools.length} / Available: ${allTools.length} (${routable} routable)\n` +
             (jevClient.stats.lastError ? `• Last error: ${jevClient.stats.lastError}` : ""),
@@ -221,6 +227,19 @@ export function registerJevCommands(
         const enabled = arg === "on" ? true : arg === "off" ? false : !(prev ?? process.env.PI_JEV_CONSEQUENCE?.trim() !== "0");
         consequenceOverride.enabled = enabled;
         ctx.ui.notify(`Consequence gate ${enabled ? "enabled" : "disabled"}.`, "info");
+        return;
+      }
+
+      if (sub === "mcp") {
+        const arg = rest.toLowerCase();
+        if (arg !== "" && arg !== "on" && arg !== "off") {
+          ctx.ui.notify(`Unknown /jev ${sub} argument "${rest}". ${usage}`, "warning");
+          return;
+        }
+        const prev = mcpOverride.enabled;
+        const enabled = arg === "on" ? true : arg === "off" ? false : !(prev ?? process.env.PI_JEV_MCP?.trim() !== "0");
+        mcpOverride.enabled = enabled;
+        ctx.ui.notify(`MCP gate ${enabled ? "enabled" : "disabled"}.`, "info");
         return;
       }
 
