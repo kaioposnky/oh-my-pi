@@ -8,6 +8,7 @@ on:
 
 permissions:
   contents: write
+  issues: write
 
 concurrency:
   group: sync-upstream
@@ -33,13 +34,26 @@ jobs:
           git fetch upstream main
 
       - name: Rebase onto upstream/main
+        id: rebase
         run: |
           before="$(git rev-parse HEAD)"
           echo "BEFORE_SHA=$before" >> "$GITHUB_ENV"
           if ! git rebase upstream/main; then
+            stopped="$(git log -1 --format='%h %s' REBASE_HEAD)"
+            files="$(git diff --name-only --diff-filter=U)"
             git rebase --abort
-            echo "::error::Rebase onto upstream/main produced conflicts — resolve manually on 'truncated-tool-names', then re-run this workflow."
-            exit 1
+            # Stay green: the next step tracks the conflict in one issue
+            # instead of a failed-run email every day until it is resolved.
+            {
+              echo "conflict=true"
+              echo "detail<<DETAIL_EOF"
+              echo "Stopped at: \`$stopped\`"
+              echo "Conflicting files:"
+              echo "$files" | sed 's/.*/- `&`/'
+              echo "DETAIL_EOF"
+            } >> "$GITHUB_OUTPUT"
+            echo "::warning::Rebase onto upstream/main conflicts at $stopped — see the open sync issue."
+            exit 0
           fi
           # GITHUB_TOKEN cannot push workflow-file changes (no `workflows`
           # permission), and upstream workflow edits aren't needed for the
@@ -52,6 +66,7 @@ jobs:
           fi
 
       - name: Push
+        if: steps.rebase.outputs.conflict != 'true'
         run: |
           after="$(git rev-parse HEAD)"
           if [ "$after" = "$BEFORE_SHA" ]; then
@@ -59,3 +74,26 @@ jobs:
             exit 0
           fi
           git push --force-with-lease="refs/heads/truncated-tool-names:$BEFORE_SHA" origin truncated-tool-names
+
+      - name: Track conflict in a single issue
+        env:
+          GH_TOKEN: ${{ github.token }}
+          # gh prefers a remote named `upstream`; pin issues to this fork.
+          GH_REPO: ${{ github.repository }}
+          CONFLICT: ${{ steps.rebase.outputs.conflict }}
+          DETAIL: ${{ steps.rebase.outputs.detail }}
+          TITLE: Upstream sync blocked by a rebase conflict
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: |
+          issue="$(gh issue list --state open --limit 100 --json number,title --jq 'map(select(.title == env.TITLE))[0].number // empty')"
+          if [ "$CONFLICT" = "true" ]; then
+            body="$(printf 'Rebasing `truncated-tool-names` onto `upstream/main` hit a conflict. Resolve it locally, push with `--force-with-lease`, then re-run **Sync with upstream**. This issue closes itself on the next clean sync.\n\n%s\n\nLatest failed run: %s\n' "$DETAIL" "$RUN_URL")"
+            if [ -n "$issue" ]; then
+              # Body edits send no notification: one alert per conflict episode.
+              gh issue edit "$issue" --body "$body"
+            else
+              gh issue create --title "$TITLE" --body "$body" --assignee "$GITHUB_REPOSITORY_OWNER"
+            fi
+          elif [ -n "$issue" ]; then
+            gh issue close "$issue" --comment "Sync succeeded: $RUN_URL"
+          fi
