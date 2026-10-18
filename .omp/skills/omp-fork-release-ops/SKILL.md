@@ -9,7 +9,7 @@ Fork: `kaioposnky/oh-my-pi`, branch `truncated-tool-names` (NOT `main`). Fork co
 
 ## Branch model
 
-- `upstream/main` advances; `.github/workflows/sync-upstream.yml` (cron `37 5 * * *`, `workflow_dispatch`) runs `git rebase upstream/main` and force-pushes. Failed rebase → manual resolve, then re-run.
+- `upstream/main` advances; `.github/workflows/sync-upstream.yml` (cron `37 5 * * *`, `workflow_dispatch`) runs `git rebase upstream/main` and force-pushes. A conflicting rebase does not fail the run: it opens (or silently refreshes) one issue titled `Upstream sync blocked by a rebase conflict` with the stopped commit and files, and the next clean sync closes it. Resolve locally, push with `--force-with-lease`, re-run the workflow.
 - Consequence: **fork commit SHAs change every rebase**. Never compare fork commits by SHA across a rebase — use `range-diff`.
 - Push fork work with `--force-with-lease`, never a plain push after a rebase:
 
@@ -27,7 +27,7 @@ git push origin truncated-tool-names --force-with-lease
 `.github/workflows/release.yml` triggers on: `workflow_run` of "Sync with upstream" (only on success), cron `3 7 * * *`, and `workflow_dispatch`.
 
 - Version comes from **upstream's latest release tag** (`gh api repos/can1357/oh-my-pi/releases/latest`), not from our commits. So fork releases are tagged `v<upstream-latest>`.
-- Gate: release body carries `fork-build-sha:<sha>`. If the tag already has that SHA, the run skips. To force a rebuild:
+- Gate: release body carries `fork-build-sha:<sha>`. If the tag already has that SHA, the run skips. It also skips with a warning when the tree's `@oh-my-pi/pi-natives` version is not on npm (upstream tagged 18.6.2 without publishing natives); the next upstream bump unblocks it. To force a rebuild:
 
 ```bash
 gh workflow run release.yml --repo kaioposnky/oh-my-pi --ref truncated-tool-names
