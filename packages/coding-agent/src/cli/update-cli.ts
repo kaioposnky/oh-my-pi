@@ -21,7 +21,13 @@ import {
 	unsupportedProxyMessage,
 	withTimeoutSignal,
 } from "../utils/fetch-timeout";
-import { DEFAULT_NPM_REGISTRY } from "./npm-registry";
+import {
+	DEFAULT_NPM_REGISTRY,
+	loadNpmRegistryResolver,
+	type NpmRegistry,
+	type NpmRegistryResolver,
+	npmRegistryPackageUrl,
+} from "./npm-registry";
 
 import { cfgUpdateChannel } from "../modes/settings";
 
