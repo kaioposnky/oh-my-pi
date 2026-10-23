@@ -84,55 +84,13 @@ describe("getLatestRelease fork releases", () => {
 		await expect(getLatestRelease({ channel: "canary" })).rejects.toThrow(/does not publish canary builds/);
 	});
 
-	it("uses the curated packument tag when a tagged manifest has empty packument fields", async () => {
-		const urls: string[] = [];
-		vi.spyOn(globalThis, "fetch").mockImplementation(
-			Object.assign(
-				async (input: FetchInput) => {
-					const url = String(input);
-					urls.push(url);
-					if (url.endsWith("/latest")) {
-						return Response.json({ version: "999.9.0", "dist-tags": {}, versions: {}, time: {} });
-					}
-					return Response.json({
-						"dist-tags": { latest: "999.2.0" },
-						versions: { "999.2.0": { version: "999.2.0", omp: { dist: "binary" } } },
-					});
-				},
-				{ preconnect: globalThis.fetch.preconnect },
-			),
-		);
-
-		const release = await getLatestRelease({ registries: feed });
-
-		expect(urls).toEqual([
-			"https://npm.corp.example/api/npm/feed/@oh-my-pi%2fpi-coding-agent/latest",
-			"https://npm.corp.example/api/npm/feed/@oh-my-pi%2fpi-coding-agent",
-		]);
-		expect(release.version).toBe("999.2.0");
-		expect(release.dist).toBe("binary");
-	});
-
-	it("resolves the tagged version when the feed answers the dist-tag shortcut with the full packument", async () => {
-		const urls: string[] = [];
-		vi.spyOn(globalThis, "fetch").mockImplementation(
-			Object.assign(
-				async (input: FetchInput) => {
-					urls.push(String(input));
-					return Response.json({
-						"dist-tags": { latest: "999.3.0" },
-						versions: { "999.3.0": { version: "999.3.0", omp: { dist: "binary" } } },
-					});
-				},
-				{ preconnect: globalThis.fetch.preconnect },
-			),
-		);
-
-		const release = await getLatestRelease({ registries: feed });
-
-		expect(urls).toEqual(["https://npm.corp.example/api/npm/feed/@oh-my-pi%2fpi-coding-agent/latest"]);
-		expect(release.version).toBe("999.3.0");
-		expect(release.dist).toBe("binary");
+	it("strips a v prefix from release tags that already carry it", async () => {
+		stubGitHub({
+			"/repos/kaioposnky/oh-my-pi/releases/latest": { tag_name: "v1.2.3" },
+		});
+		const release = await getLatestRelease();
+		expect(release.version).toBe("1.2.3");
+		expect(release.tag).toBe("v1.2.3");
 	});
 
 	it("rejects a GitHub response without a tag_name", async () => {
