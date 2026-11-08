@@ -1298,8 +1298,12 @@ export async function discoverOpenAIModelsList(
 			} as ModelSpec<Api>);
 			continue;
 		}
-		const api =
-			providerConfig.discovery.type === "litellm"
+		const anthropicMessages =
+			providerConfig.discovery.anthropicMessages?.some(prefix => prefix.length > 0 && id.startsWith(prefix)) ===
+			true;
+		const api: Api = anthropicMessages
+			? "anthropic-messages"
+			: providerConfig.discovery.type === "litellm"
 				? resolveLiteLLMApi(item, id, providerConfig.api)
 				: providerConfig.api;
 		const contextWindow = reportedContextWindow ?? DISCOVERY_DEFAULT_CONTEXT_WINDOW;
@@ -1322,7 +1326,11 @@ export async function discoverOpenAIModelsList(
 			provider: providerConfig.provider,
 			baseUrl,
 			reasoning: reference?.reasoning === true,
-			thinking: inheritReferenceThinking(undefined, reference, providerConfig.provider),
+			// The bundled Anthropic reference supplies the effort ladder for an
+			// Anthropic-wire row; `inheritReferenceThinking` refuses cross-provider.
+			thinking: anthropicMessages
+				? reference?.thinking
+				: inheritReferenceThinking(undefined, reference, providerConfig.provider),
 			input,
 			...(providerConfig.discovery.type === "lm-studio" ? { imageInputDecoder: "stb" as const } : {}),
 			// Proxy/gateway pricing is provider-specific and rarely matches
@@ -1339,15 +1347,20 @@ export async function discoverOpenAIModelsList(
 			),
 			headers: baseHeaders,
 			...(serviceTiers !== undefined ? { serviceTiers } : {}),
-			compat: {
-				supportsStore: false,
-				supportsDeveloperRole: false,
-				supportsReasoningEffort: referenceCompat?.supportsReasoningEffort ?? false,
-				...(referenceCompat?.reasoningEffortMap ? { reasoningEffortMap: referenceCompat.reasoningEffortMap } : {}),
-				...(referenceCompat?.omitReasoningEffort !== undefined
-					? { omitReasoningEffort: referenceCompat.omitReasoningEffort }
-					: {}),
-			},
+			// OpenAI-compat fields are no-ops on an Anthropic-wire row.
+			compat: anthropicMessages
+				? undefined
+				: {
+						supportsStore: false,
+						supportsDeveloperRole: false,
+						supportsReasoningEffort: referenceCompat?.supportsReasoningEffort ?? false,
+						...(referenceCompat?.reasoningEffortMap
+							? { reasoningEffortMap: referenceCompat.reasoningEffortMap }
+							: {}),
+						...(referenceCompat?.omitReasoningEffort !== undefined
+							? { omitReasoningEffort: referenceCompat.omitReasoningEffort }
+							: {}),
+					},
 		} as ModelSpec<Api>;
 		specs.push(withAdvertisedEfforts(spec, advertisedReasoning, api === "anthropic-messages"));
 	}

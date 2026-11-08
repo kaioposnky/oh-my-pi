@@ -353,7 +353,12 @@ export const getModelsConfigSchemaBundle = once(() => {
 		 * of the time.
 		 */
 		"advertisedReasoning?": "boolean",
+		/** Model ID prefixes served through the Anthropic messages endpoint. */
+		"anthropicMessages?": "string[]",
 	}).narrow((value, ctx) => {
+		if (value.anthropicMessages !== undefined && value.type !== "openai-models-list") {
+			return ctx.mustBe("anthropicMessages only on openai-models-list discovery");
+		}
 		if (value.injectV1 !== undefined && value.type !== "openai-models-list") {
 			return ctx.mustBe("injectV1 only on openai-models-list discovery");
 		}

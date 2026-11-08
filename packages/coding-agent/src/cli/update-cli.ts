@@ -631,6 +631,12 @@ export function isSourceCheckout(): boolean {
 	return !isCompiledBinary() && !import.meta.dir.split(path.sep).includes("node_modules");
 }
 
+export async function canSelfUpdate(): Promise<boolean> {
+	if (isSourceCheckout()) return false;
+	if (isPathInDirectory(isCompiledBinary() ? process.execPath : import.meta.dir, NIX_STORE_DIR)) return false;
+	return (await managedInstallName(process.execPath)) === undefined;
+}
+
 /**
  * Name of the app that manages the omp at `binaryPath`, or undefined when none does.
  *
@@ -1464,7 +1470,7 @@ async function validateExistingUpdateTarget(targetPath: string): Promise<void> {
 /**
  * Run the PATH-resolved omp binary and check if it reports the expected version.
  */
-async function verifyInstalledVersion(expectedVersion: string): Promise<InstalledVersionVerification> {
+export async function verifyInstalledVersion(expectedVersion: string): Promise<InstalledVersionVerification> {
 	const ompPath = resolveOmpPath();
 	if (!ompPath) return { ok: false };
 	const binaryPath = tryRealpath(ompPath) ?? ompPath;
@@ -2369,6 +2375,14 @@ function persistChannel(channel: UpdateChannel): void {
 	}
 }
 
+export type UpdateProgress =
+	| { phase: "downloading"; version: string; received: number; total: number }
+	| { phase: "installing"; version: string };
+export type UpdateOutcome =
+	| { kind: "current" }
+	| { kind: "available"; version: string }
+	| { kind: "unsupported"; reason: string }
+	| { kind: "installed"; version: string };
 /**
  * Run the update command.
  */
@@ -2376,7 +2390,8 @@ export async function runUpdateCommand(opts: {
 	force: boolean;
 	check: boolean;
 	channel?: UpdateChannel;
-}): Promise<void> {
+	onProgress?: (progress: UpdateProgress) => void;
+}): Promise<UpdateOutcome> {
 	console.log(chalk.dim(`Current version: ${VERSION}`));
 	const persistedChannel = readPersistedChannel() ?? "stable";
 	const channel = opts.channel ?? persistedChannel;
@@ -2398,7 +2413,7 @@ export async function runUpdateCommand(opts: {
 	if (comparison <= 0 && !rebuilt && !opts.force && !isChannelSwitch) {
 		const icon = theme?.status?.success ?? "✔";
 		console.log(chalk.green(`${icon} Already up to date`));
-		return;
+		return { kind: "current" };
 	}
 
 	if (isChannelSwitch) {
@@ -2420,7 +2435,7 @@ export async function runUpdateCommand(opts: {
 
 	if (opts.check) {
 		// Just check, don't install
-		return;
+		return { kind: "available", version: release.version };
 	}
 
 	// Choose update method based on the prioritized omp binary in PATH. For
@@ -2435,13 +2450,14 @@ export async function runUpdateCommand(opts: {
 		});
 		if (channel === "canary" && (target.method === "nix" || target.method === "brew" || target.method === "mise")) {
 			console.log(chalk.yellow("Canary updates are only supported for bun, npm, or binary installs."));
-			return;
+			return { kind: "unsupported", reason: "Canary updates are only supported for bun, npm, or binary installs." };
 		}
 		if (target.method === "nix") {
 			console.log(chalk.yellow("This installation is managed by Nix and cannot update itself."));
 			console.log(chalk.dim("Update the flake input or profile that provides omp, then rebuild."));
-			return;
+			return { kind: "unsupported", reason: "This installation is managed by Nix and cannot update itself." };
 		} else if (target.method === "brew") {
+			opts.onProgress?.({ phase: "installing", version: release.version });
 			await updateViaHomebrew(release.version, opts.force);
 		} else if (target.method === "mise") {
 			await updateViaMise(release.version, opts.force);
@@ -2484,9 +2500,9 @@ export async function runUpdateCommand(opts: {
 			}
 		}
 		if (opts.channel) persistChannel(channel);
+		return { kind: "installed", version: release.version };
 	} catch (err) {
-		console.error(chalk.red(`Update failed: ${err}`));
-		process.exit(1);
+		throw new Error(`Update failed: ${err}`, { cause: err });
 	}
 }
 

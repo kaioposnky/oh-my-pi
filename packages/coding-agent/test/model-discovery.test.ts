@@ -1956,6 +1956,11 @@ describe("ModelRegistry runtime discovery", () => {
 		// rich probe succeeds. Reject it instead of accepting an ignored setting.
 		expect(ProviderDiscoverySchema.allows({ type: "litellm", advertisedReasoning: false })).toBe(false);
 	});
+	test("ProviderDiscoverySchema restricts anthropicMessages to openai-models-list", () => {
+		expect(ProviderDiscoverySchema.allows({ type: "openai-models-list", anthropicMessages: ["cc/"] })).toBe(true);
+		expect(ProviderDiscoverySchema.allows({ type: "proxy", anthropicMessages: ["cc/"] })).toBe(false);
+		expect(ProviderDiscoverySchema.allows({ type: "lm-studio", anthropicMessages: ["cc/"] })).toBe(false);
+	});
 	test("llama.cpp discovery marks per-model architecture image modalities as vision-capable", async () => {
 		const fetchMock: FetchImpl = async input => {
 			const url = String(input);
@@ -2710,6 +2715,34 @@ describe("ModelRegistry runtime discovery", () => {
 			.getAll()
 			.find(m => m.provider === "openai-test" && m.id === "openai-test/no-context-model");
 		expect(fallback?.contextWindow).toBe(128000);
+	});
+	test("openai-models-list anthropicMessages routes rows to anthropic-messages with the Anthropic effort ladder", async () => {
+		writeRawModelsJson({
+			"9router-test": {
+				baseUrl: "http://127.0.0.1:9996",
+				api: "openai-completions",
+				auth: "none",
+				discovery: { type: "openai-models-list", anthropicMessages: ["cc/"] },
+			},
+		});
+		const fetchMock: FetchImpl = async input => {
+			const url = String(input);
+			if (url === "http://127.0.0.1:9996/v1/models") {
+				return new Response(JSON.stringify({ data: [{ id: "cc/claude-haiku-5-5" }, { id: "cx/gpt-5.6-luna" }] }), {
+					status: 200,
+					headers: { "Content-Type": "application/json" },
+				});
+			}
+			throw new Error(`Unexpected URL: ${url}`);
+		};
+		const registry = new ModelRegistry(authStorage, modelsJsonPath, { fetch: fetchMock });
+		await registry.refresh();
+		const model = registry.getAll().find(m => m.provider === "9router-test" && m.id === "cc/claude-haiku-5-5");
+		expect(model?.api).toBe("anthropic-messages");
+		expect(model?.thinking?.efforts).toEqual([Effort.Low, Effort.Medium, Effort.High, Effort.XHigh, Effort.Max]);
+		expect(registry.getAll().find(m => m.provider === "9router-test" && m.id === "cx/gpt-5.6-luna")?.api).toBe(
+			"openai-completions",
+		);
 	});
 	test("openai-models-list uses top_provider.max_completion_tokens over the bundled reference", async () => {
 		writeRawModelsJson({

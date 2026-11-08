@@ -2347,7 +2347,13 @@ export class ModelRegistry {
 	 * `offline` strategy nothing else refetches them.
 	 */
 	advertisedReasoningCacheSuffix(providerConfig: DiscoveryProviderConfig): string {
-		return providerConfig.discovery.advertisedReasoning === false ? "advertised-off-context-v6" : "context-v6";
+		const advertisedOff = providerConfig.discovery.advertisedReasoning === false;
+		// `anthropicMessages` rows carry a different wire and effort ladder; a
+		// legacy openai-completions row must never satisfy that cache read.
+		if (providerConfig.discovery.anthropicMessages?.length) {
+			return `${advertisedOff ? "advertised-off-" : ""}anthropic-${encodeURIComponent(JSON.stringify(providerConfig.discovery.anthropicMessages))}-context-v6`;
+		}
+		return advertisedOff ? "advertised-off-context-v6" : "context-v6";
 	}
 
 	#configuredDiscoveryCacheProviderId(providerConfig: DiscoveryProviderConfig): string {

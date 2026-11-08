@@ -2,6 +2,10 @@
 
 ## [Unreleased]
 
+### Added
+
+- Custom OpenAI model-list discovery can route selected model ID prefixes through Anthropic messages with `discovery.anthropicMessages`.
+
 ### Changed
 
 - Models without a delegation rule (Claude, Gemini, …) no longer get pushed to delegate: the "map unknown code via task" rule and the "Task + scout" nudges in search tool descriptions are replaced by a light suggestion to explore unfamiliar subsystems with a scout
