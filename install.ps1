@@ -1,6 +1,6 @@
 <#
 .SYNOPSIS
-  Fork installer for omp (oh-my-pi) - kaioposnky/oh-my-pi (Windows).
+  Fork installer for omp (oh-my-pi) - kaioposnky/omp (Windows).
 
 .DESCRIPTION
   Installs the fork build (which carries the provider tool-name truncation fix)
@@ -18,7 +18,7 @@ param(
 )
 
 $ErrorActionPreference = "Stop"
-$Repo = "kaioposnky/oh-my-pi"
+$Repo = "kaioposnky/omp"
 $InstallDir = Join-Path $HOME ".local\bin"
 $NpmPkg = "@oh-my-pi/pi-coding-agent"
 

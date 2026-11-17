@@ -1,11 +1,11 @@
 ---
 name: omp-fork-release-ops
-description: Maintain and release the kaioposnky/oh-my-pi fork (branch `truncated-tool-names`). Covers rebase-based sync against upstream, force-with-lease push, verifying fork commits survived a rebase via range-diff, the release workflow's fork-build-sha gate, and how to force a rebuild. Use when rebasing, pushing, tagging, releasing, or debugging the fork's binary updater and CI workflows.
+description: Maintain and release the kaioposnky/omp fork (branch `truncated-tool-names`). Covers rebase-based sync against upstream, force-with-lease push, verifying fork commits survived a rebase via range-diff, the release workflow's fork-build-sha gate, and how to force a rebuild. Use when rebasing, pushing, tagging, releasing, or debugging the fork's binary updater and CI workflows.
 ---
 
 # omp fork release ops
 
-Fork: `kaioposnky/oh-my-pi`, branch `truncated-tool-names` (NOT `main`). Fork commits sit on top of `upstream/main` (can1357/oh-my-pi) and are rebased daily.
+Fork: `kaioposnky/omp`, branch `truncated-tool-names` (NOT `main`). Fork commits sit on top of `upstream/main` (can1357/oh-my-pi) and are rebased daily.
 
 ## Branch model
 
@@ -30,9 +30,9 @@ git push origin truncated-tool-names --force-with-lease
 - Gate: release body carries `fork-build-sha:<sha>`. If the tag already has that SHA, the run skips. It also skips with a warning when the tree's `@oh-my-pi/pi-natives` version is not on npm (upstream tagged 18.6.2 without publishing natives); the next upstream bump unblocks it. To force a rebuild:
 
 ```bash
-gh workflow run release.yml --repo kaioposnky/oh-my-pi --ref truncated-tool-names
+gh workflow run release.yml --repo kaioposnky/omp --ref truncated-tool-names
 # or, to rebuild the same commit:  -f force=true
-gh run list --repo kaioposnky/oh-my-pi --workflow=release.yml --limit 3
+gh run list --repo kaioposnky/omp --workflow=release.yml --limit 3
 ```
 
 - CI installs with `--minimum-release-age=3600` (1h floor) because the repo's 3-day policy blocks fresh upstream dep bumps. Don't "fix" this back to 3 days.

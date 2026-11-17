@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 #
-# Fork installer for omp (oh-my-pi) — kaioposnky/oh-my-pi
+# Fork installer for omp (oh-my-pi) — kaioposnky/omp
 #
 # Installs the fork build (which carries the provider tool-name truncation fix)
 # over any existing omp installation, verifying the binary download against the
@@ -11,7 +11,7 @@
 #
 set -euo pipefail
 
-REPO="kaioposnky/oh-my-pi"
+REPO="kaioposnky/omp"
 BRANCH="truncated-tool-names"
 BIN_NAME="omp"
 INSTALL_DIR="$HOME/.local/bin"

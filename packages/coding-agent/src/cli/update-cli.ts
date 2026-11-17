@@ -780,7 +780,7 @@ export async function getLatestRelease(
  * package, and its binaries must never be confused with upstream's. Both the
  * version check and the binary download resolve here.
  */
-export const REPO = "kaioposnky/oh-my-pi";
+export const REPO = "kaioposnky/omp";
 
 const FORK_RELEASES_URL = `https://api.github.com/repos/${REPO}/releases`;
 const FORK_CHECKSUMS_ASSET = "SHA256SUMS.txt";

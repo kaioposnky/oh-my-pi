@@ -1,6 +1,6 @@
 # Development Rules
 
-## Fork operations (kaioposnky/oh-my-pi)
+## Fork operations (kaioposnky/omp)
 
 - Default branch is `truncated-tool-names`. `.github/workflows/sync-upstream.yml` rebases it onto `upstream/main` daily and force-pushes; a failed rebase means upstream touched our commits — resolve manually, then re-run the workflow.
 - `.github/workflows/release.yml` builds omp binaries from this branch head and publishes GitHub releases tagged `v<upstream-latest>` with `SHA256SUMS.txt`. CI pins bun via root `package.json` → `packageManager` and installs with a 1-hour release-age floor (the repo's 3-day policy stays for local dev).

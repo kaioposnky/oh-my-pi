@@ -31,7 +31,7 @@ jobs:
       GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       UPSTREAM_REPO: can1357/oh-my-pi
       FORK_BRANCH: truncated-tool-names
-      FORK_REPO: kaioposnky/oh-my-pi
+      FORK_REPO: kaioposnky/omp
     steps:
       - uses: actions/checkout@v4
         with:
