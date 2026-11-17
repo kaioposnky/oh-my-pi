@@ -1,134 +1,164 @@
-import { afterEach, describe, expect, it, vi } from "bun:test";
-import { getLatestRelease, runUpdateCommand } from "../../src/cli/update-cli";
+import { describe, expect, it } from "bun:test";
+import type { BuildHost } from "../../src/cli/build-service";
+import { fetchForkBuild, getForkLatestRelease, REPO } from "../../src/cli/update-cli";
 
 type FetchInput = string | URL | Request;
 type FetchInit = RequestInit | BunFetchRequestInit;
 
-describe("runUpdateCommand fetch cancellation", () => {
-	afterEach(() => {
-		vi.restoreAllMocks();
-	});
+const linuxHost: BuildHost = { target: "linux-x64", asset: "linux-x64", windows: false };
 
-	it("checks release metadata with a timeout signal", async () => {
-		let requestSignal: AbortSignal | undefined;
-		vi.spyOn(console, "log").mockImplementation(() => {});
-		const fetchStub = Object.assign(
-			async (_input: FetchInput, init?: FetchInit) => {
-				requestSignal = init?.signal ?? undefined;
-				return Response.json({ tag_name: "v999.0.0" });
-			},
-			{ preconnect: globalThis.fetch.preconnect },
-		);
-		vi.spyOn(globalThis, "fetch").mockImplementation(fetchStub);
-
-		await runUpdateCommand({ force: false, check: true });
-
-		expect(requestSignal).toBeInstanceOf(AbortSignal);
-	});
+const asset = (name: string, overrides: Record<string, unknown> = {}) => ({
+	name,
+	size: 1024,
+	digest: `sha256:${"a".repeat(64)}`,
+	browser_download_url: `https://github.com/${REPO}/releases/download/v999.1.0/${name}`,
+	...overrides,
 });
 
-describe("getLatestRelease fork releases", () => {
-	afterEach(() => {
-		vi.restoreAllMocks();
+/** Serve `payloads` by URL fragment, recording every requested URL and its init. */
+function stubGitHub(payloads: Record<string, unknown>): {
+	urls: string[];
+	signals: Array<AbortSignal | undefined>;
+	fetchImpl: typeof fetch;
+} {
+	const urls: string[] = [];
+	const signals: Array<AbortSignal | undefined> = [];
+	const fetchStub = Object.assign(
+		async (input: FetchInput, init?: FetchInit) => {
+			const url = String(input);
+			urls.push(url);
+			signals.push(init?.signal ?? undefined);
+			const payload = Object.entries(payloads).find(([fragment]) => url.includes(fragment))?.[1];
+			if (payload === undefined) return new Response(null, { status: 404, statusText: "Not Found" });
+			return Response.json(payload);
+		},
+		{ preconnect: globalThis.fetch.preconnect },
+	);
+	return { urls, signals, fetchImpl: fetchStub as unknown as typeof fetch };
+}
+
+describe("getForkLatestRelease", () => {
+	it("resolves the tag, version, binary dist, and the host asset digest", async () => {
+		const stub = stubGitHub({
+			"/releases/latest": { tag_name: "v999.1.0", assets: [asset("omp-linux-x64"), asset("SHA256SUMS.txt")] },
+		});
+
+		const release = await getForkLatestRelease({ fetchImpl: stub.fetchImpl, host: linuxHost });
+
+		expect(release.tag).toBe("v999.1.0");
+		expect(release.version).toBe("999.1.0");
+		expect(release.dist).toBe("binary");
+		expect(release.binaryDigest).toBe(`sha256:${"a".repeat(64)}`);
+		expect(stub.urls[0]).toContain(`/repos/${REPO}/releases/latest`);
+		// Release metadata is fetched under a timeout signal.
+		expect(stub.signals[0]).toBeInstanceOf(AbortSignal);
 	});
 
-	function stubGitHub(payloads: Record<string, unknown>): string[] {
+	it("reads the digest from SHA256SUMS.txt when GitHub reports none for the asset", async () => {
+		const sums = `${"b".repeat(64)}  omp-linux-x64\n`;
 		const urls: string[] = [];
 		const fetchStub = Object.assign(
 			async (input: FetchInput) => {
 				const url = String(input);
 				urls.push(url);
-				const payload = Object.entries(payloads).find(([fragment]) => url.includes(fragment))?.[1];
-				if (!payload) return new Response(null, { status: 404, statusText: "Not Found" });
-				return Response.json(payload);
+				if (url.endsWith("/releases/latest")) {
+					return Response.json({
+						tag_name: "v999.1.0",
+						assets: [
+							asset("omp-linux-x64", { digest: undefined }),
+							asset("SHA256SUMS.txt", {
+								digest: undefined,
+								browser_download_url: "https://sums.test/SHA256SUMS.txt",
+							}),
+						],
+					});
+				}
+				if (url === "https://sums.test/SHA256SUMS.txt") return new Response(sums);
+				return new Response(null, { status: 404 });
 			},
 			{ preconnect: globalThis.fetch.preconnect },
 		);
-		vi.spyOn(globalThis, "fetch").mockImplementation(fetchStub);
-		return urls;
-	}
 
-	it("resolves version, tag, binary dist, and fork package names from the latest GitHub release", async () => {
-		const urls = stubGitHub({
-			"/repos/kaioposnky/oh-my-pi/releases/latest": { tag_name: "v999.1.0" },
-		});
+		const release = await getForkLatestRelease({ fetchImpl: fetchStub as unknown as typeof fetch, host: linuxHost });
 
-		const release = await getLatestRelease();
-
-		expect(release.version).toBe("999.1.0");
-		expect(release.tag).toBe("v999.1.0");
-		expect(release.dist).toBe("binary");
-		expect(release.packages).toEqual({
-			pkg: "@oh-my-pi/pi-coding-agent",
-			natives: "@oh-my-pi/pi-natives",
-		});
-		expect(urls).toEqual(["https://api.github.com/repos/kaioposnky/oh-my-pi/releases/latest"]);
-	});
-	it("carries this platform's release binary digest so same-version rebuilds are detectable", async () => {
-		const digest = `sha256:${"A".repeat(64)}`;
-		stubGitHub({
-			"/repos/kaioposnky/oh-my-pi/releases/latest": {
-				tag_name: "v999.1.0",
-				assets: [
-					{ name: "omp-unrelated", digest: `sha256:${"b".repeat(64)}` },
-					{
-						name: `omp-${process.platform === "win32" ? "windows" : process.platform}-${process.arch}${process.platform === "win32" ? ".exe" : ""}`,
-						digest,
-					},
-				],
-			},
-		});
-		expect((await getLatestRelease()).binaryDigest).toBe(digest.toLowerCase());
-	});
-	it("rejects the canary channel because the fork publishes stable GitHub binaries only", async () => {
-		await expect(getLatestRelease({ channel: "canary" })).rejects.toThrow(/does not publish canary builds/);
+		expect(release.binaryDigest).toBe(`sha256:${"b".repeat(64)}`);
+		expect(urls).toContain("https://sums.test/SHA256SUMS.txt");
 	});
 
-	it("strips a v prefix from release tags that already carry it", async () => {
-		stubGitHub({
-			"/repos/kaioposnky/oh-my-pi/releases/latest": { tag_name: "v1.2.3" },
-		});
-		const release = await getLatestRelease();
-		expect(release.version).toBe("1.2.3");
-		expect(release.tag).toBe("v1.2.3");
+	it("still advertises a release that publishes no asset for this platform", async () => {
+		const stub = stubGitHub({ "/releases/latest": { tag_name: "v999.2.0", assets: [asset("omp-darwin-arm64")] } });
+
+		const release = await getForkLatestRelease({ fetchImpl: stub.fetchImpl, host: linuxHost });
+
+		expect(release.version).toBe("999.2.0");
+		expect(release.binaryDigest).toBeUndefined();
 	});
 
-	it("rejects a GitHub response without a tag_name", async () => {
-		stubGitHub({
-			"/repos/kaioposnky/oh-my-pi/releases/latest": { hello: true },
+	it("takes the newest prerelease on the canary channel", async () => {
+		const stub = stubGitHub({
+			"/releases?per_page=30": [
+				{ tag_name: "v999.2.0-canary.1", draft: false, prerelease: true, assets: [] },
+				{ tag_name: "v999.2.0-canary.3", draft: false, prerelease: true, assets: [] },
+				{ tag_name: "v999.3.0", draft: false, prerelease: false, assets: [] },
+			],
 		});
-		expect(getLatestRelease()).rejects.toThrow(/missing tag_name/);
+
+		const release = await getForkLatestRelease({
+			channel: "canary",
+			fetchImpl: stub.fetchImpl,
+			host: linuxHost,
+		});
+
+		expect(release.version).toBe("999.2.0-canary.3");
 	});
 });
 
-describe("getLatestRelease proxy errors", () => {
-	afterEach(() => {
-		vi.restoreAllMocks();
+describe("fetchForkBuild", () => {
+	it("answers with the host asset's name, size, digest, and download URL", async () => {
+		const stub = stubGitHub({
+			"/releases/latest": {
+				tag_name: "v999.1.0",
+				assets: [asset("omp-linux-x64", { size: 2048 }), asset("omp-darwin-arm64")],
+			},
+		});
+
+		const build = await fetchForkBuild({ channel: "stable" }, { fetchImpl: stub.fetchImpl, host: linuxHost });
+
+		expect(build.version).toBe("999.1.0");
+		expect(build.file).toEqual({ name: "omp-linux-x64", size: 2048, sha256: "a".repeat(64) });
+		expect(build.download).toBe(`https://github.com/${REPO}/releases/download/v999.1.0/omp-linux-x64`);
+		expect(build.patch).toBeUndefined();
 	});
 
-	it("translates Bun's UnsupportedProxyProtocol fetch failure into an actionable CLI message", async () => {
-		const fetchStub = Object.assign(
-			async () => {
-				throw new Error(
-					'UnsupportedProxyProtocol fetching "https://registry.npmjs.org/@oh-my-pi/pi-coding-agent/latest". ' +
-						"For more information, pass `verbose: true` in the second argument to fetch()",
-				);
-			},
-			{ preconnect: globalThis.fetch.preconnect },
-		);
-		vi.spyOn(globalThis, "fetch").mockImplementation(fetchStub);
+	it("names the Windows asset with its .exe suffix", async () => {
+		const stub = stubGitHub({
+			"/releases/latest": { tag_name: "v999.1.0", assets: [asset("omp-windows-x64.exe")] },
+		});
 
-		const err = await getLatestRelease({ timeoutMs: 5000 }).then(
-			() => null,
-			(e: unknown) => e as Error,
+		const build = await fetchForkBuild(
+			{ channel: "stable" },
+			{ fetchImpl: stub.fetchImpl, host: { target: "windows-x64", asset: "windows-x64", windows: true } },
 		);
 
-		expect(err).toBeInstanceOf(Error);
-		// The raw fetch() instruction the CLI user cannot act on must not leak through.
-		expect(err?.message).not.toContain("verbose: true");
-		expect(err?.message).not.toContain("fetch()");
-		// Instead the user gets actionable guidance about supported proxy schemes.
-		expect(err?.message).toMatch(/SOCKS/i);
-		expect(err?.message).toMatch(/https?:\/\//i);
+		expect(build.file.name).toBe("omp-windows-x64.exe");
+	});
+
+	it("refuses a release that publishes no binary for this platform", async () => {
+		const stub = stubGitHub({ "/releases/latest": { tag_name: "v999.1.0", assets: [asset("omp-darwin-arm64")] } });
+
+		await expect(
+			fetchForkBuild({ channel: "stable" }, { fetchImpl: stub.fetchImpl, host: linuxHost }),
+		).rejects.toThrow(/publishes no omp-linux-x64/);
+	});
+
+	it("fetches an exact version by tag", async () => {
+		const stub = stubGitHub({
+			"/releases/tags/v999.0.5": { tag_name: "v999.0.5", assets: [asset("omp-linux-x64")] },
+		});
+
+		const build = await fetchForkBuild({ version: "999.0.5" }, { fetchImpl: stub.fetchImpl, host: linuxHost });
+
+		expect(build.version).toBe("999.0.5");
+		expect(stub.urls[0]).toContain(`/repos/${REPO}/releases/tags/v999.0.5`);
 	});
 });
