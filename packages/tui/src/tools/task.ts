@@ -1424,7 +1424,10 @@ export function renderResult(
 	const aborted = abortedCount > 0;
 	const failed = failCount > 0;
 	const mergeFailed = mergeFailedCount > 0;
-	const isError = aborted || failed;
+	// `result.isError` also catches failures with no child rows to attribute:
+	// preflight refusals (`results: []`) and a child that finished before an
+	// isolation merge or nested patch apply threw.
+	const isError = aborted || failed || result.isError === true;
 	const agentCount = hasResults ? details.results.length : (details.progress?.length ?? 0);
 	const icon: ToolUIStatus = options.isPartial ? "running" : isError ? "error" : mergeFailed ? "warning" : "success";
 	// Header meta is the spawn count only; each row carries its own ⟨agent⟩

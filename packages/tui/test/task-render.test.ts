@@ -288,6 +288,25 @@ describe("task live progress rendering", () => {
 
 		expect(render(0)).toBe(render(1));
 	});
+
+	it("marks a failed call with no spawned results as an error card", () => {
+		const details: TaskToolDetails = { projectAgentsDir: null, results: [], totalDurationMs: 0 };
+		const text = strip(
+			renderResult(
+				{
+					content: [{ type: "text", text: "Per-call model is disabled for task calls (task.perCallModel: off)." }],
+					details,
+					isError: true,
+				},
+				{ expanded: false, isPartial: false },
+				uiTheme,
+			).render(120),
+		);
+
+		expect(text).toContain(uiTheme.symbol("status.error"));
+		expect(text).not.toContain(uiTheme.symbol("status.success"));
+		expect(text).toContain("Per-call model is disabled");
+	});
 });
 
 describe("taskCardAgentIds", () => {
